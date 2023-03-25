@@ -1,1 +1,3 @@
 *.swp
+word_list*
+*.pyc
