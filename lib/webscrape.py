@@ -12,7 +12,9 @@ def fetch_page(word):
 
 
 def parse_html(page):
-    word_with_stress = page.find("div", {"class": "bare"}).text
+    cache = {}
+
+    cache["word_with_stress"] = page.find("div", {"class": "bare"}).text
 
     overview_html = page.find("div", {"class": "overview"})
     overview = (
@@ -20,7 +22,6 @@ def parse_html(page):
         if overview_html is not None
         else []
     )
-
     partner = None
     overview_filtered = []
     for overview_entry in overview:
@@ -28,6 +29,10 @@ def parse_html(page):
             partner = overview_entry.text
         else:
             overview_filtered.append(overview_entry.text)
+    if overview_filtered != []:
+        cache["overview"] = overview_filtered
+    if partner is not None:
+        cache["partner"] = partner
 
     definitions = [
         p.text
@@ -36,6 +41,7 @@ def parse_html(page):
         )
         for p in content.find_all("p")
     ]
+    cache["definitions"] = definitions
 
     usage_info_html = page.find("div", {"class": "usage"})
     usage_info = (
@@ -46,21 +52,33 @@ def parse_html(page):
         if usage_info_html is not None
         else []
     )
+    if usage_info != []:
+        cache["usage_info"] = usage_info
 
     tables = []
     table_html = page.find_all("table")
     for html in table_html:
-        headers = [
-            [child.text for child in row.children] for row in html.find_all("tr")
+        headers_html = [
+            [child for child in row.children] for row in html.find_all("tr")
         ]
+
+        headers = []
+        for header_list_html in headers_html:
+            header_list = []
+            for header_html in header_list_html:
+                for elem in header_html.find_all("span", {"class": "short"}):
+                    elem.clear()
+                if len(header_html.find_all("p")) == 0:
+                    header_list.append(header_html.text)
+                else:
+                    header_list.append(
+                        ", ".join([child.text for child in header_html.find_all("p")])
+                    )
+            headers.append(header_list)
+
         table = tabulate(headers)
         tables.append(table)
+    if tables != []:
+        cache["tables"] = tables
 
-    return (
-        word_with_stress,
-        overview_filtered,
-        definitions,
-        usage_info,
-        partner,
-        tables,
-    )
+    return cache
