@@ -168,7 +168,7 @@ class Application:
         print("\033cWord", end="\n\n")
         cache = self.cached.get_cache(self.current_word)
         word = cache.get("word_with_stress", None)
-        pair = cache.get("pair", None)
+        pair = cache.get("partner", None)
         print(f"{word}", end="\n\n")
         if pair is not None:
             print(f"{pair}", end="\n\n")
