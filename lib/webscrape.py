@@ -22,17 +22,11 @@ def parse_html(page):
         if overview_html is not None
         else []
     )
-    partner = None
     overview_filtered = []
     for overview_entry in overview:
-        if "partner" in overview_entry.text:
-            partner = overview_entry.text
-        else:
-            overview_filtered.append(overview_entry.text)
+        overview_filtered.append(overview_entry.text)
     if overview_filtered != []:
         cache["overview"] = overview_filtered
-    if partner is not None:
-        cache["partner"] = partner
 
     definitions = [
         p.text

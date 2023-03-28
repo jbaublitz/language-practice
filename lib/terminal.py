@@ -105,7 +105,7 @@ class Application:
             self.next_entry()
             self.entry()
         elif code == "r":
-            self.cached.pop(self.current_word)
+            self.cached.refresh_cache(self.current_word, self.current_definition)
             self.entry()
 
         return True
@@ -131,8 +131,8 @@ class Application:
                 self.cached.set_cache(self.current_word, parsed)
 
         cache = self.cached.get_cache(self.current_word)
-        overviews = cache.get("overview", None)
-        translations = cache.get("definitions", None)
+        overviews = cache.get("overview", [])
+        translations = cache.get("definitions", [])
 
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
 
@@ -149,8 +149,8 @@ class Application:
 
     def extended_entry(self):
         cache = self.cached.get_cache(self.current_word)
-        overviews = cache.get("overview", None)
-        translations = cache.get("definitions", None)
+        overviews = cache.get("overview", [])
+        translations = cache.get("definitions", [])
 
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
 
@@ -168,10 +168,7 @@ class Application:
         print("\033cWord", end="\n\n")
         cache = self.cached.get_cache(self.current_word)
         word = cache.get("word_with_stress", None)
-        pair = cache.get("partner", None)
         print(f"{word}", end="\n\n")
-        if pair is not None:
-            print(f"{pair}", end="\n\n")
         tty.setraw(sys.stdin)
 
     def usage_info(self):
