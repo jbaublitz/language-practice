@@ -40,7 +40,7 @@ class Application:
             self.iter = iter(self.words.items())
             (word, definition) = next(self.iter)
             self.current_word = word
-            self.current_defintion = definition
+            self.current_definition = definition
 
             self.correct_path = f"{name}-correct.txt"
             try:
@@ -114,7 +114,7 @@ class Application:
         try:
             (word, definition) = next(self.iter)
             self.current_word = word
-            self.current_defintion = definition
+            self.current_definition = definition
         except StopIteration:
             raise RuntimeError("Completed words")
 
