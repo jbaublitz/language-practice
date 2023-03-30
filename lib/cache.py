@@ -18,7 +18,7 @@ class Cache:
 
     def refresh_cache(self, word, static_definition):
         if static_definition is not None:
-            self.cache[word] = static_definition
+            self.cache[word] = {"definitions": [static_definition]}
         else:
             html = fetch_page(word)
             self.cache[word] = parse_html(html)

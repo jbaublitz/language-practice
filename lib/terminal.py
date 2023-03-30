@@ -130,9 +130,15 @@ class Application:
                 parsed = parse_html(html)
                 self.cached.set_cache(self.current_word, parsed)
 
-        cache = self.cached.get_cache(self.current_word)
-        overviews = cache.get("overview", [])
-        translations = cache.get("definitions", [])
+        try:
+            cache = self.cached.get_cache(self.current_word)
+            overviews = cache.get("overview", [])
+            translations = cache.get("definitions", [])
+        except Exception:
+            self.cached.refresh_cache(self.current_word, self.current_definition)
+            cache = self.cached.get_cache(self.current_word)
+            overviews = cache.get("overview", [])
+            translations = cache.get("definitions", [])
 
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
 
@@ -168,6 +174,8 @@ class Application:
         print("\033cWord", end="\n\n")
         cache = self.cached.get_cache(self.current_word)
         word = cache.get("word_with_stress", None)
+        if word is None:
+            word = self.current_word
         print(f"{word}", end="\n\n")
         tty.setraw(sys.stdin)
 
