@@ -97,10 +97,10 @@ class Application:
             self.chart()
         elif code == "d":
             self.show_word()
-        elif code == "-":
+        elif code == "n":
             self.next_entry()
             self.entry()
-        elif code == "=":
+        elif code == "y":
             self.correct.add(self.current_word)
             self.next_entry()
             self.entry()
