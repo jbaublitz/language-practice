@@ -12,12 +12,13 @@ from lib.cache import Cache
 
 
 class Application:
-    def __init__(self, word_path):
+    def __init__(self, word_path, offline):
         if not word_path.endswith(".txt"):
             raise RuntimeError("Word file needs to be a text file")
 
         try:
             self.word_path = word_path
+            self.offline = offline
             with open(self.word_path, "r") as word_file:
                 self.words = []
                 for word in [
@@ -56,7 +57,9 @@ class Application:
                 print(e)
                 self.correct = set()
 
-            if len(self.correct) == len(self.words):
+            if len(self.correct) == len(self.words) or (
+                self.offline and len(self.correct) == len(self.cached)
+            ):
                 self.correct = set()
 
             self.settings = termios.tcgetattr(sys.stdin.fileno())
@@ -119,7 +122,12 @@ class Application:
             raise RuntimeError("Completed words")
 
     def entry(self):
-        while self.current_word in self.correct:
+        while self.current_word in self.correct or (
+            self.offline
+            and (
+                self.current_word not in self.cached and self.current_definition is None
+            )
+        ):
             self.next_entry()
 
         if self.current_word not in self.cached:

@@ -16,6 +16,9 @@ class Cache:
     def __contains__(self, elem):
         return elem in self.cache
 
+    def __len__(self):
+        return len(self.cache)
+
     def refresh_cache(self, word, static_definition):
         if static_definition is not None:
             self.cache[word] = {"definitions": [static_definition]}
