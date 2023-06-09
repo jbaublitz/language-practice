@@ -20,28 +20,22 @@ class Application:
             self.word_path = word_path
             self.offline = offline
             with open(self.word_path, "r") as word_file:
-                self.words = []
+                words = []
                 for word in [
                     word for word in word_file.read().split("\n") if word != ""
                 ]:
                     split = [split for split in word.split(",") if split != ""]
                     if len(split) == 1:
-                        self.words.append((split[0], None))
+                        words.append((split[0], None))
                     else:
                         (word, defintion) = split[:2]
-                        self.words.append((word, defintion))
-            shuffle(self.words)
-            self.words = OrderedDict(self.words)
+                        words.append((word, defintion))
 
             (name, _) = os.path.splitext(self.word_path)
-
             self.cache_path = f"{name}-cache.json"
-            self.cached = Cache(self.cache_path)
+            self.cached = Cache(self.cache_path, words)
 
-            self.iter = iter(self.words.items())
-            (word, definition) = next(self.iter)
-            self.current_word = word
-            self.current_definition = definition
+            self.words = self.cached.words()
 
             self.correct_path = f"{name}-correct.txt"
             try:
@@ -56,6 +50,11 @@ class Application:
             except Exception as e:
                 print(e)
                 self.correct = set()
+
+            self.words = list(self.words.difference(self.correct))
+            shuffle(self.words)
+            self.iter = iter(self.words)
+            self.word = next(self.iter)
 
             if len(self.correct) == len(self.words) or (
                 self.offline and len(self.correct) == len(self.cached)
@@ -101,52 +100,23 @@ class Application:
         elif code == "d":
             self.show_word()
         elif code == "n":
-            self.next_entry()
+            self.word = next(self.iter)
+            if self.word is None:
+                return False
             self.entry()
         elif code == "y":
-            self.correct.add(self.current_word)
-            self.next_entry()
-            self.entry()
-        elif code == "r":
-            self.cached.refresh_cache(self.current_word, self.current_definition)
+            self.word = next(self.iter)
+            if self.word is None:
+                return False
+            self.correct.add(self.word)
             self.entry()
 
         return True
 
-    def next_entry(self):
-        try:
-            (word, definition) = next(self.iter)
-            self.current_word = word
-            self.current_definition = definition
-        except StopIteration:
-            raise RuntimeError("Completed words")
-
     def entry(self):
-        while self.current_word in self.correct or (
-            self.offline
-            and (
-                self.current_word not in self.cached and self.current_definition is None
-            )
-        ):
-            self.next_entry()
-
-        if self.current_word not in self.cached:
-            if self.current_definition is not None:
-                self.cached.set_cache(self.current_word, [self.current_definition])
-            else:
-                html = fetch_page(self.current_word)
-                parsed = parse_html(html)
-                self.cached.set_cache(self.current_word, parsed)
-
-        try:
-            cache = self.cached.get_cache(self.current_word)
-            overviews = cache.get("overview", [])
-            translations = cache.get("definitions", [])
-        except Exception:
-            self.cached.refresh_cache(self.current_word, self.current_definition)
-            cache = self.cached.get_cache(self.current_word)
-            overviews = cache.get("overview", [])
-            translations = cache.get("definitions", [])
+        cache = self.cached.get_cache(self.word)
+        overviews = cache.get("overview", [])
+        translations = cache.get("definitions", [])
 
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
 
@@ -162,7 +132,7 @@ class Application:
         tty.setraw(sys.stdin)
 
     def extended_entry(self):
-        cache = self.cached.get_cache(self.current_word)
+        cache = self.cached.get_cache(self.word)
         overviews = cache.get("overview", [])
         translations = cache.get("definitions", [])
 
@@ -180,16 +150,16 @@ class Application:
     def show_word(self):
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033cWord", end="\n\n")
-        cache = self.cached.get_cache(self.current_word)
+        cache = self.cached.get_cache(self.word)
         word = cache.get("word_with_stress", None)
         if word is None:
-            word = self.current_word
+            word = self.word
         print(f"{word}", end="\n\n")
         tty.setraw(sys.stdin)
 
     def usage_info(self):
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
-        usages = self.cached.get_cache(self.current_word).get("usage_info", [])
+        usages = self.cached.get_cache(self.word).get("usage_info", [])
         print("\033cUsage", end="\n\n")
         for usage in usages:
             print(f"{usage}", end="\n\n")
@@ -198,7 +168,7 @@ class Application:
     def chart(self):
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        tables = self.cached.get_cache(self.current_word).get("tables", [])
+        tables = self.cached.get_cache(self.word).get("tables", [])
         for table in tables:
             print(f"{table}", end="\n\n")
         tty.setraw(sys.stdin)
