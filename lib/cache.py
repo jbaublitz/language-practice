@@ -4,7 +4,7 @@ from lib.webscrape import fetch_page, parse_html
 
 
 class Cache:
-    def __init__(self, file_path, words):
+    def __init__(self, file_path, words, offline):
         self.file_path = file_path
 
         try:
@@ -13,7 +13,7 @@ class Cache:
         except Exception:
             self.cache = {}
 
-        self.build_cache(words)
+        self.build_cache(words, offline)
 
     def __contains__(self, elem):
         return elem in self.cache
@@ -23,13 +23,16 @@ class Cache:
 
     def build_cache(self, words, offline):
         for word, definition in words:
-            if word not in self:
-                if definition is not None:
-                    self.cache[word] = {"definitions": [definition]}
-                else:
-                    if not offline:
-                        html = fetch_page(word)
-                        self.cache[word] = parse_html(html)
+            if definition is not None:
+                self.cache[word] = {"definitions": [definition]}
+            elif word not in self and not offline:
+                html = fetch_page(word)
+                self.cache[word] = parse_html(html)
+
+    def refresh_cache(self, word, offline):
+        if not offline:
+            html = fetch_page(word)
+            self.cache[word] = parse_html(html)
 
     def set_cache(self, word, entry):
         self.cache[word] = entry

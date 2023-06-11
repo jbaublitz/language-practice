@@ -33,7 +33,7 @@ class Application:
 
             (name, _) = os.path.splitext(self.word_path)
             self.cache_path = f"{name}-cache.json"
-            self.cached = Cache(self.cache_path, words)
+            self.cached = Cache(self.cache_path, words, self.offline)
 
             self.words = self.cached.words()
 
@@ -109,6 +109,9 @@ class Application:
             if self.word is None:
                 return False
             self.correct.add(self.word)
+            self.entry()
+        elif code == "r":
+            self.cached.refresh_cache(self.word, self.offline)
             self.entry()
 
         return True
