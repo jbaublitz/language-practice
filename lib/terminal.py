@@ -105,10 +105,10 @@ class Application:
                 return False
             self.entry()
         elif code == "y":
+            self.correct.add(self.word)
             self.word = next(self.iter)
             if self.word is None:
                 return False
-            self.correct.add(self.word)
             self.entry()
         elif code == "r":
             self.cached.refresh_cache(self.word, self.offline)
