@@ -14,7 +14,7 @@ class Application:
         try:
             self.word_path = word_path
             with open(self.word_path, "r") as word_file:
-                self.words = set([])
+                self.words = {}
                 for word in [
                     word for word in word_file.read().split("\n") if word != ""
                 ]:
@@ -24,7 +24,7 @@ class Application:
                     except ValueError:
                         pass
                     else:
-                        self.words.add((word, definition))
+                        self.words[word] = definition
 
             (name, _) = os.path.splitext(self.word_path)
 
@@ -42,7 +42,10 @@ class Application:
                 print(e)
                 self.correct = set()
 
-            self.words = list(self.words.difference(self.correct))
+            for correct in self.correct:
+                del self.words[correct]
+
+            self.words = [(k, v) for k, v in self.words.items()]
             shuffle(self.words)
             self.iter = iter(self.words)
             (self.word, self.definition) = next(self.iter)
