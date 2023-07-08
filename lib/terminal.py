@@ -1,31 +1,19 @@
-from random import shuffle
 import os
 import regex
 import sys
 import termios
 import tty
 
+from lib.toml import TomlConfig
+
 
 class Application:
     def __init__(self, word_path):
-        if not word_path.endswith(".txt"):
-            raise RuntimeError("Word file needs to be a text file")
+        if not word_path.endswith(".toml"):
+            raise RuntimeError("Word file needs to be a TOML file")
+        self.word_path = word_path
 
         try:
-            self.word_path = word_path
-            with open(self.word_path, "r") as word_file:
-                self.words = {}
-                for word in [
-                    word for word in word_file.read().split("\n") if word != ""
-                ]:
-                    split = [split for split in word.split("|")]
-                    try:
-                        (word, definition) = split
-                    except ValueError:
-                        pass
-                    else:
-                        self.words[word] = definition
-
             (name, _) = os.path.splitext(self.word_path)
 
             self.correct_path = f"{name}-correct.txt"
@@ -42,13 +30,10 @@ class Application:
                 print(e)
                 self.correct = set()
 
-            for correct in self.correct:
-                del self.words[correct]
+            self.words = TomlConfig(self.word_path, self.correct)
 
-            self.words = [(k, v) for k, v in self.words.items()]
-            shuffle(self.words)
             self.iter = iter(self.words)
-            (self.word, self.definition) = next(self.iter)
+            self.next = next(self.iter)
 
             if len(self.correct) == len(self.words):
                 self.correct = set()
@@ -83,16 +68,18 @@ class Application:
             self.entry()
         elif code == "d":
             self.show_word()
+        elif code == "c":
+            self.chart()
         elif code == "n":
             try:
-                (self.word, self.definition) = next(self.iter)
+                self.next = next(self.iter)
             except StopIteration:
                 return False
             self.entry()
         elif code == "y":
-            self.correct.add(self.word)
+            self.correct.add(self.next.show_word())
             try:
-                (self.word, self.definition) = next(self.iter)
+                self.next = next(self.iter)
             except StopIteration:
                 return False
             self.entry()
@@ -102,11 +89,20 @@ class Application:
     def entry(self):
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        print(f"{self.definition}")
+        entry = self.next.entry()
+        print(f"{entry}")
+        tty.setraw(sys.stdin)
+
+    def chart(self):
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
+        print("\033c", end="")
+        chart = self.next.chart()
+        print(f"{chart}")
         tty.setraw(sys.stdin)
 
     def show_word(self):
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        print(f"{self.word}", end="\n\n")
+        word = self.next.show_word()
+        print(f"{word}", end="\n\n")
         tty.setraw(sys.stdin)
