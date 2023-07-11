@@ -35,9 +35,6 @@ class Application:
             self.iter = iter(self.words)
             self.next = next(self.iter)
 
-            if len(self.correct) == len(self.words):
-                self.correct = set()
-
             self.settings = termios.tcgetattr(sys.stdin.fileno())
             tty.setraw(sys.stdin.fileno())
 
@@ -47,6 +44,9 @@ class Application:
             while cont:
                 code = sys.stdin.read(1)
                 cont = self.handle_code(code)
+
+            if set([word.show_word() for word in self.words]).difference(self.correct) == set():
+                self.correct = set()
         except:
             self.shutdown()
             raise
@@ -87,22 +87,28 @@ class Application:
         return True
 
     def entry(self):
+        entry = self.next.entry()
+        if entry is None:
+            return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        entry = self.next.entry()
         print(f"{entry}")
         tty.setraw(sys.stdin)
 
     def chart(self):
+        chart = self.next.chart()
+        if chart is None:
+            return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        chart = self.next.chart()
         print(f"{chart}")
         tty.setraw(sys.stdin)
 
     def show_word(self):
+        word = self.next.show_word()
+        if word is None:
+            return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        word = self.next.show_word()
-        print(f"{word}", end="\n\n")
+        print(f"{word}")
         tty.setraw(sys.stdin)
