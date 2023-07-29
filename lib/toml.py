@@ -5,18 +5,55 @@ from random import shuffle
 
 class TomlEntry:
     def __init__(self, dct):
+        self.word = dct["word"]
+        self.definition = dct["definition"]
+
         if dct["pos"] == "v":
             self.pos = "verb"
             if dct["aspect"] == "impf":
                 self.aspect = "imperfective"
-                self.tense = "present"
             elif dct["aspect"] == "pf":
                 self.aspect = "perfective"
-                self.tense = "future"
             else:
                 raise RuntimeError("Unrecognized aspect for verb")
 
-            self.conj = dct[self.tense]
+            if "present" in dct:
+                self.present = dct["present"]
+            if self.aspect == "perfective":
+                self.future = dct["future"]
+            else:
+                self.future = {
+                    "fs": f"бу́ду {self.word}",
+                    "ss": f"бу́дешь {self.word}",
+                    "ts": f"бу́дет {self.word}",
+                    "fp": f"бу́дем {self.word}",
+                    "sp": f"бу́дете {self.word}",
+                    "tp": f"бу́дут {self.word}",
+                }
+            if "past" in dct:
+                self.past = dct["past"]
+            else:
+                if self.word.endswith("ть"):
+                    stem = self.word.replace("ть", "")
+                    self.past = {
+                        "ms": stem + "л",
+                        "fs": stem + "ла",
+                        "ns": stem + "ло",
+                        "p": stem + "ли",
+                    }
+                elif self.word.endswith("ться"):
+                    stem = self.word.replace("ться", "")
+                    self.past = {
+                        "ms": stem + "лся",
+                        "fs": stem + "лась",
+                        "ns": stem + "лось",
+                        "p": stem + "лись",
+                    }
+            self.part = dct["participles"]
+            self.imp = dct["imperative"]
+
+            self.conj = self.future if self.aspect == "perfective" else self.present
+
             if (
                 "ts" not in self.conj
                 and "fp" not in self.conj
@@ -44,63 +81,140 @@ class TomlEntry:
             else:
                 raise RuntimeError("Unrecognized gender for noun")
 
-            self.decl = dct["declension"]
+            self.sing = dct["singular"]
+            self.plu = dct["plural"]
         elif dct["pos"] == "adv":
             self.pos = "adverb"
         elif dct["pos"] == "adj":
             self.pos = "adjective"
-            self.masc = dct["masc"]
-            self.neu = dct["neu"]
-            self.fem = dct["fem"]
+            self.masc = dct["masculine"]
+            self.neu = dct["neuter"]
+            self.fem = dct["feminine"]
             self.plu = dct["plural"]
         elif dct["pos"] == "expr":
             self.pos = "expression"
         else:
             raise RuntimeError("Unrecognized part of speech")
 
-        self.word = dct["word"]
-        self.definition = dct["definition"]
-
     def entry(self):
         if self.pos == "verb":
             return f"{self.pos}\n\n{self.aspect}\n\n{self.definition}"
-        if self.pos == "noun" or self.pos == "adverb" or self.pos == "adjective" or self.pos == "expression":
+        if (
+            self.pos == "noun"
+            or self.pos == "adverb"
+            or self.pos == "adjective"
+            or self.pos == "expression"
+        ):
             return f"{self.pos}\n\n{self.definition}"
 
     def show_word(self):
-        if self.pos == "verb" or self.pos == "adverb" or self.pos == "adjective" or self.pos == "expression":
+        if (
+            self.pos == "verb"
+            or self.pos == "adverb"
+            or self.pos == "adjective"
+            or self.pos == "expression"
+        ):
             return f"{self.word}"
         elif self.pos == "noun":
             return f"({self.gender}) {self.word}"
 
     def chart(self):
         if self.pos == "verb":
-            tense = self.tense
-            table = tabulate(
+            if hasattr(self, "present"):
+                table = tabulate(
+                    [
+                        ["", "present", "future"],
+                        ["я", self.present["fs"], self.future["fs"]],
+                        ["ты", self.present["ss"], self.future["ss"]],
+                        ["он/она/оно", self.present["ts"], self.future["ts"]],
+                        ["мы", self.present["fp"], self.future["fp"]],
+                        ["вы", self.present["sp"], self.future["sp"]],
+                        ["они", self.present["tp"], self.future["tp"]],
+                    ]
+                )
+            else:
+                table = tabulate(
+                    [
+                        ["", "future"],
+                        ["я", self.future["fs"]],
+                        ["ты", self.future["ss"]],
+                        ["он/она/оно", self.future["ts"]],
+                        ["мы", self.future["fp"]],
+                        ["вы", self.future["sp"]],
+                        ["они", self.future["tp"]],
+                    ]
+                )
+
+            imperative = tabulate(
                 [
-                    ["", self.tense],
-                    ["я", self.conj["fs"]],
-                    ["ты", self.conj["ss"]],
-                    ["он/она/оно", self.conj["ts"]],
-                    ["мы", self.conj["fp"]],
-                    ["вы", self.conj["sp"]],
-                    ["они", self.conj["tp"]]
+                    ["", "imperative"],
+                    ["singular", self.imp["s"]],
+                    ["plural", self.imp["p"]],
                 ]
             )
 
-            return f"{tense}\n\n{table}"
+            if self.aspect == "perfective":
+                participles_header = ["", "past"]
+            else:
+                participles_header = ["", "present", "past"]
+            active_participles = ["active"]
+            if self.aspect == "imperfective":
+                active_participles.append(
+                    "" if self.part.get("pres_act") is None else self.part["pres_act"]
+                )
+            active_participles.append(
+                "" if self.part.get("past_act") is None else self.part["past_act"]
+            )
+            passive_participles = ["passive"]
+            if self.aspect == "imperfective":
+                passive_participles.append(
+                    ""
+                    if self.part.get("pres_pass") is None
+                    else self.part["pres_pass"],
+                )
+            passive_participles.append(
+                "" if self.part.get("past_pass") is None else self.part["past_pass"],
+            )
+            adverbial_participles = ["adverbial"]
+            if self.aspect == "imperfective":
+                adverbial_participles.append(
+                    "" if self.part.get("pres_adv") is None else self.part["pres_adv"],
+                )
+            adverbial_participles.append(
+                "" if self.part.get("past_adv_l") is None else self.part["past_adv_l"],
+            )
+
+            participles_list = [
+                participles_header,
+                active_participles,
+                passive_participles,
+                adverbial_participles,
+            ]
+            if "past_adv_s" in self.part:
+                if self.aspect == "imperfective":
+                    participles_list.append(
+                        ["adverbial short", "", self.part["past_adv_s"]]
+                    )
+                else:
+                    participles_list.append(
+                        ["adverbial short", self.part["past_adv_s"]]
+                    )
+            participles = tabulate(participles_list)
+
+            return f"{table}\n\n{imperative}\n\n{participles}"
+
         elif self.pos == "noun":
             table = [
                 ["", "singular", "plural"],
-                ["nominative", self.decl["ns"], self.decl["np"]],
-                ["genitive", self.decl["gs"], self.decl["gp"]],
-                ["dative", self.decl["ds"], self.decl["dp"]],
-                ["accusative", self.decl["as"], self.decl["ap"]],
-                ["instrumental", self.decl["is"], self.decl["ip"]],
-                ["prepositional", self.decl["ps"], self.decl["pp"]],
+                ["nominative", self.sing["n"], self.plu["n"]],
+                ["genitive", self.sing["g"], self.plu["g"]],
+                ["dative", self.sing["d"], self.plu["d"]],
+                ["accusative", self.sing["a"], self.plu["a"]],
+                ["instrumental", self.sing["i"], self.plu["i"]],
+                ["prepositional", self.sing["p"], self.plu["p"]],
             ]
-            if "ls" in self.decl:
-                table.append(["locative", self.decl["ls"], ""])
+            if "ls" in self.sing:
+                table.append(["locative", self.sing["l"], ""])
             table = tabulate(table)
 
             return f"{table}"
@@ -109,21 +223,58 @@ class TomlEntry:
         elif self.pos == "adjective":
             table = [
                 ["", "masculine", "neuter", "feminine", "plural"],
-                ["nominative", self.masc["n"], self.neu["n"],
-                    self.fem["n"], self.plu["n"]],
-                ["genitive", self.masc["g"], self.neu["g"],
-                    self.fem["g"], self.plu["g"]],
-                ["dative", self.masc["d"], self.neu["d"],
-                    self.fem["d"], self.plu["d"]],
-                ["accusative", self.masc["a"], self.neu["a"],
-                    self.fem["a"], self.plu["a"]],
-                ["instrumental", self.masc["i"], self.neu["i"],
-                    self.fem["i"], self.plu["i"]],
-                ["prepositional", self.masc["p"], self.neu["p"],
-                    self.fem["p"], self.plu["p"]],
-                ["short", self.masc["short"], self.neu["short"],
-                    self.fem["short"], self.plu["short"]],
+                [
+                    "nominative",
+                    self.masc["n"],
+                    self.neu["n"],
+                    self.fem["n"],
+                    self.plu["n"],
+                ],
+                [
+                    "genitive",
+                    self.masc["g"],
+                    self.neu["g"],
+                    self.fem["g"],
+                    self.plu["g"],
+                ],
+                ["dative", self.masc["d"], self.neu["d"], self.fem["d"], self.plu["d"]],
+                [
+                    "accusative",
+                    self.masc["a"],
+                    self.neu["a"],
+                    self.fem["a"],
+                    self.plu["a"],
+                ],
+                [
+                    "instrumental",
+                    self.masc["i"],
+                    self.neu["i"],
+                    self.fem["i"],
+                    self.plu["i"],
+                ],
+                [
+                    "prepositional",
+                    self.masc["p"],
+                    self.neu["p"],
+                    self.fem["p"],
+                    self.plu["p"],
+                ],
             ]
+            if (
+                "short" in self.masc
+                and "short" in self.fem
+                and "short" in self.neu
+                and "short" in self.plu
+            ):
+                table.append(
+                    [
+                        "short",
+                        self.masc["short"],
+                        self.neu["short"],
+                        self.fem["short"],
+                        self.plu["short"],
+                    ]
+                )
             table = tabulate(table)
 
             return f"{table}"

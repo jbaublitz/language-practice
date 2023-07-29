@@ -26,8 +26,7 @@ class Application:
                             if correct != ""
                         ]
                     )
-            except Exception as e:
-                print(e)
+            except Exception:
                 self.correct = set()
 
             self.words = TomlConfig(self.word_path, self.correct)
@@ -45,7 +44,10 @@ class Application:
                 code = sys.stdin.read(1)
                 cont = self.handle_code(code)
 
-            if set([word.show_word() for word in self.words]).difference(self.correct) == set():
+            if (
+                set([word.show_word() for word in self.words]).difference(self.correct)
+                == set()
+            ):
                 self.correct = set()
         except:
             self.shutdown()
