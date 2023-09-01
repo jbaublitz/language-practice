@@ -1,3 +1,9 @@
+"""
+Flash card app built for the Russian language.
+
+Inflection charts are pulled from wiktionary.
+"""
+
 import sys
 from lib.terminal import Application
 
@@ -12,12 +18,12 @@ def main():
         word_file = sys.argv[1]
 
         Application(word_file)
-    except Exception as e:
+    except Exception as err:
         if traceback:
-            raise e
-        else:
-            print("{}".format(e))
-            sys.exit(1)
+            raise err
+
+        print(f"{err}")
+        sys.exit(1)
     except KeyboardInterrupt:
         print("Exiting...")
 
