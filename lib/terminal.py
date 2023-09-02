@@ -5,7 +5,7 @@ import tty
 
 from lib.cache import Cache
 from lib.toml import TomlConfig
-from lib.web import Page
+from lib.web import refresh, scrape
 
 
 class Application:
@@ -14,25 +14,29 @@ class Application:
             raise RuntimeError("Word file needs to be a TOML file")
         self.word_path = word_path
 
+        (name, _) = os.path.splitext(self.word_path)
+
+        self.correct_path = f"{name}-correct.txt"
         try:
-            (name, _) = os.path.splitext(self.word_path)
+            with open(self.correct_path, "r", encoding="utf-8") as correct_file:
+                self.correct = set(
+                    correct
+                    for correct in correct_file.read().split("\n")
+                    if correct != ""
+                )
+        except IOError:
+            self.correct = set()
 
-            self.correct_path = f"{name}-correct.txt"
-            try:
-                with open(self.correct_path, "r", encoding="utf-8") as correct_file:
-                    self.correct = set(
-                        correct
-                        for correct in correct_file.read().split("\n")
-                        if correct != ""
-                    )
-            except IOError:
-                self.correct = set()
+        self.cache_path = f"{name}-cache.json"
+        self.cache = Cache(self.cache_path)
 
-            self.cache_path = f"{name}-cache.json"
-            self.cache = Cache(self.cache_path)
+        self.words = TomlConfig(self.word_path, self.correct, self.cache)
 
-            self.words = TomlConfig(self.word_path, self.correct, self.cache)
+    async def startup(self):
+        await scrape([word.get_word() for word in self.words], self.cache)
 
+    def run(self):
+        try:
             self.iter = iter(self.words)
             self.next = next(self.iter)
 
@@ -125,7 +129,7 @@ class Application:
         tty.setraw(sys.stdin)
 
     def refresh_cache(self):
-        self.cache[self.next.show_word()] = Page(self.next.show_word()).show_charts()
+        self.cache[self.next.show_word()] = refresh(self.next.show_word())
 
     def show_word(self):
         word = self.next.show_word()

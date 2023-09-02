@@ -4,7 +4,9 @@ Flash card app built for the Russian language.
 Inflection charts are pulled from wiktionary.
 """
 
+import asyncio
 import sys
+
 from lib.terminal import Application
 
 
@@ -17,7 +19,9 @@ def main():
 
         word_file = sys.argv[1]
 
-        Application(word_file)
+        app = Application(word_file)
+        asyncio.run(app.startup())
+        app.run()
     except Exception as err:
         if traceback:
             raise err

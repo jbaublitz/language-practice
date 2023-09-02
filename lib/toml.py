@@ -3,8 +3,6 @@ from tomllib import load
 
 from tabulate import tabulate
 
-from lib.web import Page
-
 
 class TomlEntry:
     def __init__(self, cache, dct):
@@ -15,9 +13,6 @@ class TomlEntry:
             self.gender = dct.get("gender")
             self.aspect = dct.get("aspect")
             self.usage = dct.get("usage")
-            if self.word not in cache:
-                page = Page(self.word)
-                self.cache[self.word] = page.show_charts()
         except KeyError as msg:
             error = f"Key {msg} not found"
             if hasattr(self, "word"):
@@ -32,6 +27,9 @@ class TomlEntry:
 
     def show_usage(self):
         return self.usage
+
+    def get_word(self):
+        return self.word
 
     def show_word(self):
         if self.gender is None:
