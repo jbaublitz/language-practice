@@ -76,7 +76,6 @@ class Repetition:
                 self.repetitions.insert(0, WordRepetition(word))
 
     def peek(self):
-        print([rep.get_word() for rep in self.repetitions])
         return self.repetitions[0].get_word() if len(self.repetitions) > 0 else None
 
     def incorrect(self):
