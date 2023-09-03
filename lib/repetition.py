@@ -16,7 +16,6 @@ class Repetition:
                 "level3": deque(),
                 "level4": deque(),
                 "level5": deque(),
-                "all_words": words,
             }
 
         self.level1 = deque(dct["level1"])
