@@ -1,4 +1,3 @@
-from random import shuffle
 from tomllib import load
 
 

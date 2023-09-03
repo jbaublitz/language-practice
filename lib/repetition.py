@@ -2,102 +2,95 @@ from collections import deque
 import json
 
 
+class WordRepetition:
+    def __init__(self, word, dct={}):
+        self.word = word
+
+        self.correct = dct["correct"] if "correct" in dct else 0
+        self.incorrect = dct["incorrect"] if "incorrect" in dct else 0
+        self.incorrect_since_ten_correct = (
+            dct["incorrect_since_ten_correct"]
+            if "incorrect_since_ten_correct" in dct
+            else 0
+        )
+
+    def get_word(self):
+        return self.word
+
+    def mark_correct(self):
+        self.correct += 1
+        self.incorrect = 0
+        if self.correct >= 10:
+            self.incorrect_since_ten_correct = 0
+
+    def mark_incorrect(self):
+        self.incorrect += 1
+        self.correct = 0
+        self.incorrect_since_ten_correct += 1
+
+    def repeat_in(self):
+        index = 15
+        if self.correct == 0:
+            index = max(index - self.incorrect, 1)
+        elif self.incorrect == 0:
+            initial = max(index - self.incorrect_since_ten_correct, 1)
+            initial *= self.correct
+
+        return index
+
+    def save(self):
+        return {
+            "word": self.word,
+            "correct": self.correct,
+            "incorrect": self.correct,
+            "incorrect_since_ten_correct": self.incorrect_since_ten_correct,
+        }
+
+
 class Repetition:
     def __init__(self, path, words):
         self.repetition_path = path
 
         try:
             with open(self.repetition_path, "r", encoding="utf-8") as file_handle:
-                dct = json.loads(file_handle.read())
+                lst = json.loads(file_handle.read())
+                self.all_words = set(dct["word"] for dct in lst)
+                self.repetitions = deque(
+                    WordRepetition(rep_dct["word"], rep_dct) for rep_dct in lst
+                )
         except IOError:
-            dct = {
-                "level1": deque(words),
-                "level2": deque(),
-                "level3": deque(),
-                "level4": deque(),
-                "level5": deque(),
-            }
-
-        self.level1 = deque(dct["level1"])
-        self.level2 = deque(dct["level2"])
-        self.level3 = deque(dct["level3"])
-        self.level4 = deque(dct["level4"])
-        self.level5 = deque(dct["level5"])
-        self.all_words = set(
-            self.level1 + self.level2 + self.level3 + self.level4 + self.level5
-        )
+            self.repetitions = deque(WordRepetition(word) for word in words)
+            self.all_words = set(words)
+        except json.JSONDecodeError:
+            self.repetitions = deque(WordRepetition(word) for word in words)
+            self.all_words = set(words)
+        except KeyError:
+            self.repetitions = deque(WordRepetition(word) for word in words)
+            self.all_words = set(words)
+        except TypeError:
+            self.repetitions = deque(WordRepetition(word) for word in words)
+            self.all_words = set(words)
 
         for word in words:
             if word not in self.all_words:
-                self.level1.append(word)
-                self.all_words.add(word)
+                self.repetitions.insert(0, WordRepetition(word))
 
-    def next(self):
-        try:
-            return (1, self.level1.pop())
-        except IndexError:
-            pass
+    def peek(self):
+        print([rep.get_word() for rep in self.repetitions])
+        return self.repetitions[0].get_word() if len(self.repetitions) > 0 else None
 
-        try:
-            return (2, self.level2.pop())
-        except IndexError:
-            pass
+    def incorrect(self):
+        elem = self.repetitions.popleft()
+        elem.mark_incorrect()
+        index = elem.repeat_in()
+        self.repetitions.insert(min(index, len(self.repetitions)), elem)
 
-        try:
-            return (3, self.level3.pop())
-        except IndexError:
-            pass
+    def correct(self):
+        elem = self.repetitions.popleft()
+        elem.mark_correct()
+        index = elem.repeat_in()
+        self.repetitions.insert(min(index, len(self.repetitions)), elem)
 
-        try:
-            return (4, self.level4.pop())
-        except IndexError:
-            pass
-
-        try:
-            return (5, self.level5.pop())
-        except IndexError:
-            return None
-
-    def incorrect(self, word):
-        self.level1.appendleft(word)
-
-    def correct(self, level, word):
-        match level:
-            case 1:
-                self.level2.appendleft(word)
-            case 2:
-                self.level3.appendleft(word)
-            case 3:
-                self.level4.appendleft(word)
-            case 4:
-                self.level5.appendleft(word)
-            case 5:
-                self.level5.appendleft(word)
-
-    def save(self, level, word):
-        match level:
-            case 1:
-                self.level1.append(word)
-            case 2:
-                self.level2.append(word)
-            case 3:
-                self.level3.append(word)
-            case 4:
-                self.level4.append(word)
-            case 5:
-                self.level5.append(word)
-
-        level1 = [word for word in self.level1]
-        level2 = [word for word in self.level2]
-        level3 = [word for word in self.level3]
-        level4 = [word for word in self.level4]
-        level5 = [word for word in self.level5]
-        dct = {
-            "level1": level1,
-            "level2": level2,
-            "level3": level3,
-            "level4": level4,
-            "level5": level5,
-        }
+    def save(self):
         with open(self.repetition_path, "w", encoding="utf-8") as file_handle:
-            file_handle.write(json.dumps(dct))
+            file_handle.write(json.dumps([item.save() for item in self.repetitions]))

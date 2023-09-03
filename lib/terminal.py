@@ -15,7 +15,6 @@ class Application:
     def __init__(self, word_path):
         if not word_path.endswith(".toml"):
             raise RuntimeError("Word file needs to be a TOML file")
-        word_path = word_path
         (name, _) = os.path.splitext(word_path)
         repetition_path = f"{name}-repetition.json"
         cache_path = f"{name}-cache.json"
@@ -25,14 +24,14 @@ class Application:
         self.repetition = Repetition(repetition_path, self.words.get_words())
 
     async def startup(self):
-        await scrape([word for word in self.words], self.cache)
+        await scrape(self.words.get_words(), self.cache)
 
     def run(self):
         try:
             self.settings = termios.tcgetattr(sys.stdin.fileno())
             tty.setraw(sys.stdin.fileno())
 
-            (self.level, current_word) = self.repetition.next()
+            current_word = self.repetition.peek()
             self.current_entry = self.words[current_word]
 
             self.definition()
@@ -45,14 +44,14 @@ class Application:
         except:
             self.shutdown()
             raise
-        else:
-            self.shutdown()
+
+        self.shutdown()
 
     def shutdown(self):
         if hasattr(self, "settings"):
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         if hasattr(self, "repetition"):
-            self.repetition.save(self.level, self.current_entry.get_word())
+            self.repetition.save()
         if hasattr(self, "cache"):
             self.cache.save()
 
@@ -71,13 +70,13 @@ class Application:
         elif code == "r":
             self.refresh_cache()
         elif code == "n":
-            self.repetition.incorrect(self.current_entry.get_word())
-            (self.level, current_word) = self.repetition.next()
+            self.repetition.incorrect()
+            current_word = self.repetition.peek()
             self.current_entry = self.words[current_word]
             self.definition()
         elif code == "y":
-            self.repetition.correct(self.level, self.current_entry.get_word())
-            (self.level, current_word) = self.repetition.next()
+            self.repetition.correct()
+            current_word = self.repetition.peek()
             self.current_entry = self.words[current_word]
             self.definition()
 
