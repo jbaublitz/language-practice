@@ -3,6 +3,8 @@ import sys
 import termios
 import tty
 
+from tabulate import tabulate
+
 from lib.cache import Cache
 from lib.toml import TomlConfig
 from lib.web import refresh, scrape
@@ -30,7 +32,7 @@ class Application:
         self.cache_path = f"{name}-cache.json"
         self.cache = Cache(self.cache_path)
 
-        self.words = TomlConfig(self.word_path, self.correct, self.cache)
+        self.words = TomlConfig(self.word_path, self.correct)
 
     async def startup(self):
         await scrape([word.get_word() for word in self.words], self.cache)
@@ -107,7 +109,7 @@ class Application:
             return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        print(f"{entry}")
+        print(entry)
         tty.setraw(sys.stdin)
 
     def usage(self):
@@ -116,16 +118,17 @@ class Application:
             return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        print(f"{usage}")
+        print(usage)
         tty.setraw(sys.stdin)
 
     def chart(self):
-        chart = self.next.chart()
-        if chart is None:
+        charts = self.cache[self.next.get_word()]
+        if charts is None:
             return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        print(f"{chart}")
+        for chart in charts:
+            print(tabulate(chart, tablefmt="pretty"), end="\n\n")
         tty.setraw(sys.stdin)
 
     def refresh_cache(self):
@@ -137,5 +140,5 @@ class Application:
             return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        print(f"{word}")
+        print(word)
         tty.setraw(sys.stdin)
