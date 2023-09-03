@@ -11,13 +11,13 @@ class TomlEntry:
             self.aspect = dct.get("aspect")
             self.usage = dct.get("usage")
             self.part_of_speech = dct.get("part_of_speech")
-        except KeyError as msg:
-            error = f"Key {msg} not found"
+        except KeyError as err:
+            error = f"Key {err} not found"
             if hasattr(self, "word"):
                 error += f" for entry {self.word}"
-            raise RuntimeError(error) from msg
+            raise RuntimeError(error) from err
 
-    def entry(self):
+    def show_definition(self):
         ret = self.definition
         if self.aspect is not None:
             ret = f"[{self.aspect}] " + ret
@@ -41,17 +41,23 @@ class TomlEntry:
 
 
 class TomlConfig:
-    def __init__(self, file_path, correct):
-        with open(file_path, "rb") as file_handle:
-            self.words = [
-                TomlEntry(dct)
-                for dct in load(file_handle)["words"]
-                if dct["word"] not in correct
-            ]
-        shuffle(self.words)
+    def __init__(self, file_path):
+        try:
+            with open(file_path, "rb") as file_handle:
+                self.words = {
+                    dct["word"]: TomlEntry(dct) for dct in load(file_handle)["words"]
+                }
+        except KeyError as err:
+            raise RuntimeError(f"Key {err} not found") from err
 
     def __iter__(self):
         return iter(self.words)
 
     def __len__(self):
         return len(self.words)
+
+    def __getitem__(self, item):
+        return self.words[item]
+
+    def get_words(self):
+        return self.words.keys()
