@@ -1,3 +1,6 @@
+"""
+Handles web scraping.
+"""
 import asyncio
 
 import aiohttp
@@ -8,6 +11,9 @@ URL = "https://en.wiktionary.org/wiki/"
 
 
 def parse(html):
+    """
+    Parse HTML returned from web request.
+    """
     all_tables = html.find_all("table", {"class": "inflection-table"})
     if all_tables == []:
         return None
@@ -32,8 +38,11 @@ def parse(html):
 
 
 def refresh(word):
+    """
+    Refresh individual cache entry.
+    """
     try:
-        response = get(URL + word.replace("\u0301", ""))
+        response = get(URL + word.replace("\u0301", ""), timeout=5)
         if response.status_code == 404:
             return None
         html = BeautifulSoup(response.text, "html.parser")
@@ -43,6 +52,9 @@ def refresh(word):
 
 
 async def fetch(session, word):
+    """
+    Fetch individual word asynchronously.
+    """
     try:
         async with session.get(URL + word.replace("\u0301", "")) as response:
             if response.status == 404:
@@ -55,6 +67,9 @@ async def fetch(session, word):
 
 
 async def scrape(words, cache):
+    """
+    Fetch all words asynchronously.
+    """
     async with aiohttp.ClientSession() as session:
         words_not_in_cache = [word for word in words if word not in cache]
         ret = await asyncio.gather(

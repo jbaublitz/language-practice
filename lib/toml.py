@@ -1,7 +1,14 @@
+"""
+Handles TOML parsing from the configuration file.
+"""
 from tomllib import load
 
 
 class TomlEntry:
+    """
+    A single entry in the TOML file.
+    """
+
     def __init__(self, dct):
         try:
             self.word = dct["word"]
@@ -17,6 +24,9 @@ class TomlEntry:
             raise RuntimeError(error) from err
 
     def show_definition(self):
+        """
+        Show the definition as a user readable string.
+        """
         ret = self.definition
         if self.aspect is not None:
             ret = f"[{self.aspect}] " + ret
@@ -26,12 +36,21 @@ class TomlEntry:
         return ret
 
     def show_usage(self):
+        """
+        Show the usage as a user readable string.
+        """
         return self.usage
 
     def get_word(self):
+        """
+        Return the word to be used programmatically.
+        """
         return self.word
 
     def show_word(self):
+        """
+        Show the word as a user readable string.
+        """
         ret = self.word
         if self.gender is not None:
             ret = f"[{self.gender}] " + ret
@@ -40,6 +59,10 @@ class TomlEntry:
 
 
 class TomlConfig:
+    """
+    All entries in the TOML file.
+    """
+
     def __init__(self, file_path):
         try:
             with open(file_path, "rb") as file_handle:
@@ -59,4 +82,7 @@ class TomlConfig:
         return self.words[item]
 
     def get_words(self):
+        """
+        Get a list of all words in the TOML file.
+        """
         return list(self.words.keys())

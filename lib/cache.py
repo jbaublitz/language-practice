@@ -1,8 +1,15 @@
+"""
+Handles caching for web scraped data.
+"""
 import json
 from json.decoder import JSONDecodeError
 
 
 class Cache:
+    """
+    Cache for web scraped data.
+    """
+
     def __init__(self, cache_path):
         self.cache_path = cache_path
         try:
@@ -23,5 +30,8 @@ class Cache:
         return self.cache[key]
 
     def save(self):
+        """
+        Save cache.
+        """
         with open(self.cache_path, "w", encoding="utf-8") as file_handle:
             file_handle.write(json.dumps(self.cache))

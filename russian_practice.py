@@ -11,6 +11,9 @@ from lib.terminal import Application
 
 
 def main():
+    """
+    Main function
+    """
     traceback = False
     try:
         if "--traceback" in sys.argv:
@@ -22,7 +25,7 @@ def main():
         app = Application(word_file)
         asyncio.run(app.startup())
         app.run()
-    except Exception as err:
+    except Exception as err:  # pylint: disable=broad-exception-caught
         if traceback:
             raise err
 
