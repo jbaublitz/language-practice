@@ -59,4 +59,4 @@ class TomlConfig:
         return self.words[item]
 
     def get_words(self):
-        return self.words.keys()
+        return list(self.words.keys())
