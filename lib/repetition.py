@@ -1,5 +1,6 @@
 from collections import deque
 import json
+from random import shuffle
 
 
 class WordRepetition:
@@ -50,6 +51,8 @@ class WordRepetition:
 class Repetition:
     def __init__(self, path, words):
         self.repetition_path = path
+
+        shuffle(words)
 
         try:
             with open(self.repetition_path, "r", encoding="utf-8") as file_handle:
