@@ -33,8 +33,8 @@ class WordRepetition:
         if self.correct == 0:
             index = max(index - self.incorrect, 1)
         elif self.incorrect == 0:
-            initial = max(index - self.incorrect_since_ten_correct, 1)
-            initial *= self.correct
+            index = max(index - self.incorrect_since_ten_correct, 1)
+            index *= self.correct
 
         return index
 
@@ -42,7 +42,7 @@ class WordRepetition:
         return {
             "word": self.word,
             "correct": self.correct,
-            "incorrect": self.correct,
+            "incorrect": self.incorrect,
             "incorrect_since_ten_correct": self.incorrect_since_ten_correct,
         }
 
