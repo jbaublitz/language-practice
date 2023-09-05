@@ -130,7 +130,7 @@ class Application:
         """
         Display the chart for the current word.
         """
-        charts = self.cache[self.current_entry.get_word()]
+        charts = self.cache[self.current_entry.get_word()]["charts"]
         if charts is None:
             return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
@@ -157,4 +157,14 @@ class Application:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
         print(word)
+        if "comparative" in self.cache[self.current_entry.get_word()]:
+            comparative = ", ".join(
+                self.cache[self.current_entry.get_word()]["comparative"]
+            )
+            print(f"\n\n{comparative}", end="")
+        if "superlative" in self.cache[self.current_entry.get_word()]:
+            superlative = ", ".join(
+                self.cache[self.current_entry.get_word()]["superlative"]
+            )
+            print(f"\n\n{superlative}", end="")
         tty.setraw(sys.stdin)

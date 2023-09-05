@@ -14,6 +14,8 @@ def parse(html):
     """
     Parse HTML returned from web request.
     """
+    cache = {}
+
     all_tables = html.find_all("table", {"class": "inflection-table"})
     if all_tables == []:
         return None
@@ -34,7 +36,17 @@ def parse(html):
             for i in range(max_len - len_of_line):
                 line.insert(1 + i, "")
         charts.append(chart)
-    return charts
+    cache["charts"] = charts
+
+    comparative = html.find_all("b", {"class": "comparative-form-of"})
+    if comparative != []:
+        cache["comparative"] = [comp.text for comp in comparative]
+
+    superlative = html.find_all("b", {"class": "superlative-form-of"})
+    if superlative != []:
+        cache["superlative"] = [sup.text for sup in superlative]
+
+    return cache
 
 
 def refresh(word):
