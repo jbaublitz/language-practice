@@ -34,7 +34,7 @@ def parse(html):
             for i in range(max_len - len_of_line):
                 line.insert(1 + i, "")
         charts.append(chart)
-    if not charts:
+    if charts:
         cache["charts"] = charts
 
     comparative = html.find_all("b", {"class": "comparative-form-of"})
