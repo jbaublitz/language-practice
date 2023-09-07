@@ -17,8 +17,6 @@ def parse(html):
     cache = {}
 
     all_tables = html.find_all("table", {"class": "inflection-table"})
-    if all_tables == []:
-        return None
     tables = [table for table in all_tables if table.select(".lang-ru") != []]
 
     charts = []
@@ -36,7 +34,8 @@ def parse(html):
             for i in range(max_len - len_of_line):
                 line.insert(1 + i, "")
         charts.append(chart)
-    cache["charts"] = charts
+    if not charts:
+        cache["charts"] = charts
 
     comparative = html.find_all("b", {"class": "comparative-form-of"})
     if comparative != []:
@@ -87,5 +86,5 @@ async def scrape(words, cache):
         ret = await asyncio.gather(
             *[fetch(session, word) for word in words_not_in_cache]
         )
-        for word, charts in ret:
-            cache[word] = charts
+        for word, info in ret:
+            cache[word] = info

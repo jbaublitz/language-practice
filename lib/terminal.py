@@ -130,12 +130,12 @@ class Application:
         """
         Display the chart for the current word.
         """
-        charts = self.cache[self.current_entry.get_word()]["charts"]
-        if charts is None:
+        cache = self.cache[self.current_entry.get_word()]
+        if "charts" not in cache:
             return
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
-        for chart in charts:
+        for chart in cache["charts"]:
             print(tabulate(chart, tablefmt="pretty"), end="\n\n")
         tty.setraw(sys.stdin)
 
