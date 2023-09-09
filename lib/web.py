@@ -38,11 +38,11 @@ def parse(html):
         cache["charts"] = charts
 
     comparative = html.find_all("b", {"class": "comparative-form-of"})
-    if comparative != []:
+    if comparative:
         cache["comparative"] = [comp.text for comp in comparative]
 
     superlative = html.find_all("b", {"class": "superlative-form-of"})
-    if superlative != []:
+    if superlative:
         cache["superlative"] = [sup.text for sup in superlative]
 
     return cache
