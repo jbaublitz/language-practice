@@ -157,14 +157,11 @@ class Application:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         print("\033c", end="")
         print(word)
-        if "comparative" in self.cache[self.current_entry.get_word()]:
-            comparative = ", ".join(
-                self.cache[self.current_entry.get_word()]["comparative"]
-            )
+        cache = self.cache[self.current_entry.get_word()]
+        if "comparative" in cache:
+            comparative = ", ".join(cache["comparative"])
             print(f"\n\n{comparative}", end="")
-        if "superlative" in self.cache[self.current_entry.get_word()]:
-            superlative = ", ".join(
-                self.cache[self.current_entry.get_word()]["superlative"]
-            )
+        if "superlative" in cache:
+            superlative = ", ".join(cache["superlative"])
             print(f"\n\n{superlative}", end="")
         tty.setraw(sys.stdin)

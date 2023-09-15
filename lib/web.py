@@ -55,7 +55,7 @@ def refresh(word):
     try:
         response = get(URL + word.replace("\u0301", ""), timeout=5)
         if response.status_code == 404:
-            return None
+            return {}
         html = BeautifulSoup(response.text, "html.parser")
         return parse(html)
     except Exception as err:
@@ -69,7 +69,7 @@ async def fetch(session, word):
     try:
         async with session.get(URL + word.replace("\u0301", "")) as response:
             if response.status == 404:
-                return (word, None)
+                return (word, {})
             text = await response.text()
             html = BeautifulSoup(text, "html.parser")
             return (word, parse(html))
