@@ -15,14 +15,19 @@ def main():
     Main function
     """
     traceback = False
+    reset = False
     try:
         if "--traceback" in sys.argv:
             traceback = True
             sys.argv.remove("--traceback")
 
+        if "--reset" in sys.argv:
+            reset = True
+            sys.argv.remove("--reset")
+
         word_file = sys.argv[1]
 
-        app = Application(word_file)
+        app = Application(word_file, reset)
         asyncio.run(app.startup())
         app.run()
     except Exception as err:  # pylint: disable=broad-exception-caught

@@ -19,12 +19,19 @@ class Application:
     Handles the interactive user input from the terminal.
     """
 
-    def __init__(self, word_path):
+    def __init__(self, word_path, reset):
         if not word_path.endswith(".toml"):
             raise RuntimeError("Word file needs to be a TOML file")
         (name, _) = os.path.splitext(word_path)
         repetition_path = f"{name}-repetition.json"
         cache_path = f"{name}-cache.json"
+
+        if reset:
+            try:
+                os.remove(repetition_path)
+                os.remove(cache_path)
+            except FileNotFoundError:
+                pass
 
         self.settings = termios.tcgetattr(sys.stdin.fileno())
 
