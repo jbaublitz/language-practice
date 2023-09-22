@@ -5,7 +5,7 @@ Flashcard terminal app with spaced repetition
 ## Languages supported
 
 While any language with gender or verb aspect can be used, declension/verb conjugation
-charts are currently only supported for Russian. French is planned.
+charts are currently only supported for Russian and French.
 
 # Running the program
 
@@ -19,6 +19,9 @@ Command line options:
 terminal
 * `--reset`: Redownload the entire cache and current information about what words you
 have guessed correctly/incorrectly
+* `--lang`: Accepts `ru` and `fr` as values if you would like to pull conjugation or
+declension charts from Wiktionary and not specifying this value does not pull charts
+and runs in flashcard-only mode
 
 Run ctrl-C to exit the program and save your progress
 
