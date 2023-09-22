@@ -16,6 +16,7 @@ def main():
     """
     traceback = False
     reset = False
+    lang = None
     try:
         if "--traceback" in sys.argv:
             traceback = True
@@ -25,9 +26,15 @@ def main():
             reset = True
             sys.argv.remove("--reset")
 
+        if "--lang" in sys.argv:
+            idx = sys.argv.index("--lang") + 1
+            lang = sys.argv[idx]
+            sys.argv.remove("--lang")
+            sys.argv.remove(lang)
+
         word_file = sys.argv[1]
 
-        app = Application(word_file, reset)
+        app = Application(word_file, reset, lang)
         asyncio.run(app.startup())
         app.run()
     except Exception as err:  # pylint: disable=broad-exception-caught

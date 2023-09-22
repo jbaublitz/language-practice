@@ -19,9 +19,16 @@ class Application:
     Handles the interactive user input from the terminal.
     """
 
-    def __init__(self, word_path, reset):
+    def __init__(self, word_path, reset, lang):
         if not word_path.endswith(".toml"):
             raise RuntimeError("Word file needs to be a TOML file")
+        if lang is not None and lang not in ["fr", "ru"]:
+            raise RuntimeError(
+                f"Language {lang} is not supported; if you would like it to "
+                "be, please open a feature request!"
+            )
+        self.lang = lang
+
         (name, _) = os.path.splitext(word_path)
         repetition_path = f"{name}-repetition.json"
         cache_path = f"{name}-cache.json"
@@ -46,7 +53,7 @@ class Application:
         """
         Start up application.
         """
-        await scrape(self.words.get_words(), self.cache)
+        await scrape(self.words.get_words(), self.cache, self.lang)
 
     def run(self):
         """
@@ -151,7 +158,7 @@ class Application:
         Refresh the cache for the current word.
         """
         self.cache[self.current_entry.show_word()] = refresh(
-            self.current_entry.get_word()
+            self.current_entry.get_word(), self.lang
         )
 
     def show_word(self):
