@@ -178,4 +178,7 @@ class Application:
         if "superlative" in cache:
             superlative = ", ".join(cache["superlative"])
             print(f"\n\n{superlative}", end="")
+        if "adjective_forms" in cache:
+            adj_forms = ", ".join(cache["adjective_forms"])
+            print(f"\n\n{adj_forms}", end="")
         tty.setraw(sys.stdin)

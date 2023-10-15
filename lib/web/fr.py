@@ -29,4 +29,8 @@ def parse(html):
     if charts:
         cache["charts"] = charts
 
+    adj_forms = html.select(".form-of.lang-fr")
+    if adj_forms:
+        cache["adjective_forms"] = [adj.text for adj in adj_forms]
+
     return cache
