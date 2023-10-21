@@ -8,10 +8,10 @@ import tty
 
 from tabulate import tabulate
 
-from lib.cache import Cache
-from lib.repetition import Repetition
-from lib.toml import TomlConfig
-from lib.web import refresh, scrape
+from language_practice.cache import Cache
+from language_practice.repetition import Repetition
+from language_practice.toml import TomlConfig
+from language_practice.web import refresh, scrape
 
 
 class Application:

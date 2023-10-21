@@ -7,8 +7,8 @@ import aiohttp
 from bs4 import BeautifulSoup
 from requests import get
 
-from lib.web import fr
-from lib.web import ru
+from language_practice.web import fr
+from language_practice.web import ru
 
 URL = "https://en.wiktionary.org/wiki/"
 

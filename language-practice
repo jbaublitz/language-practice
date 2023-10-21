@@ -1,3 +1,7 @@
+#!/usr/bin/python3
+
+#  pylint: disable=invalid-name
+
 """
 Flash card app built for the Russian language.
 
@@ -7,7 +11,7 @@ Inflection charts are pulled from wiktionary.
 import asyncio
 import sys
 
-from lib.terminal import Application
+from language_practice.terminal import Application
 
 
 def main():
@@ -25,7 +29,13 @@ def main():
             reset = True
             sys.argv.remove("--reset")
 
-        word_file = sys.argv[1]
+        try:
+            word_file = sys.argv[1]
+        except IndexError as err:
+            print("USAGE: language-practice [--reset] [--traceback] <WORD_FILE.toml>")
+            raise RuntimeError(
+                "Missing required argument for path to word file"
+            ) from err
 
         app = Application(word_file, reset)
         asyncio.run(app.startup())
