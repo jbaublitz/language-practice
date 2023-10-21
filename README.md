@@ -7,9 +7,13 @@ Flashcard terminal app with spaced repetition
 While any language with gender or verb aspect can be used, declension/verb conjugation
 charts are currently only supported for Russian and French.
 
+## Installing
+
+Download the repo and run `pip install --user .` in the top level of the repo.
+
 # Running the program
 
-Run `./language_practice.py path/to/toml/file.toml` to start the program. This may take
+Run `/language-practice path/to/toml/file.toml` to start the program. This may take
 some time if you are using conjugation or declension charts as it will pull them in
 parallel from the internet. An internet connection is only required for this part
 of the execution.
@@ -19,15 +23,22 @@ Command line options:
 terminal
 * `--reset`: Redownload the entire cache and current information about what words you
 have guessed correctly/incorrectly
-* `--lang`: Accepts `ru` and `fr` as values if you would like to pull conjugation or
-declension charts from Wiktionary and not specifying this value does not pull charts
-and runs in flashcard-only mode
 
 Run ctrl-C to exit the program and save your progress
 
 ## File format
 
-The file format is TOML. Put each word under a `[[words]]` heading.
+The file format is TOML. 
+
+### Top level options
+
+* `lang`: Accepts `ru` and `fr` as values if you would like to pull conjugation or
+declension charts from Wiktionary. Not specifying this value does not pull charts
+and runs in flashcard-only mode.
+
+### Words
+
+Put each word under a `[[words]]` heading.
 
 Supported keys are:
 * `word`: **required**, vocabulary word to learn in another language
