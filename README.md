@@ -84,7 +84,7 @@ guess it right.
 be set to zero.
 
 The card will be repeated `n` cards later where `n` is
-`num_right * max(15 - num_wrong_since)` or `max(15 - num_wrong, 1)`.
+`num_right * max(15 - num_wrong_since, 1)` or `max(15 - num_wrong, 1)`.
 
 # Contributing
 
