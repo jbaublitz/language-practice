@@ -19,15 +19,9 @@ class Application:
     Handles the interactive user input from the terminal.
     """
 
-    def __init__(self, word_path, reset, lang):
+    def __init__(self, word_path, reset):
         if not word_path.endswith(".toml"):
             raise RuntimeError("Word file needs to be a TOML file")
-        if lang is not None and lang not in ["fr", "ru"]:
-            raise RuntimeError(
-                f"Language {lang} is not supported; if you would like it to "
-                "be, please open a feature request!"
-            )
-        self.lang = lang
 
         (name, _) = os.path.splitext(word_path)
         repetition_path = f"{name}-repetition.json"
@@ -44,6 +38,7 @@ class Application:
 
         self.cache = Cache(cache_path)
         self.words = TomlConfig(word_path)
+        self.lang = self.words.get_lang()
         self.repetition = Repetition(repetition_path, self.words.get_words())
 
         current_word = self.repetition.peek()

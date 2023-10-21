@@ -66,9 +66,15 @@ class TomlConfig:
     def __init__(self, file_path):
         try:
             with open(file_path, "rb") as file_handle:
-                self.words = {
-                    dct["word"]: TomlEntry(dct) for dct in load(file_handle)["words"]
-                }
+                toml = load(file_handle)
+                lang = toml["lang"]
+                if lang is not None and lang not in ["fr", "ru"]:
+                    raise RuntimeError(
+                        f"Language {lang} is not supported; if you would like it to "
+                        "be, please open a feature request!"
+                    )
+                self.lang = lang
+                self.words = {dct["word"]: TomlEntry(dct) for dct in toml["words"]}
         except KeyError as err:
             raise RuntimeError(f"Key {err} not found") from err
 
@@ -80,6 +86,12 @@ class TomlConfig:
 
     def __getitem__(self, item):
         return self.words[item]
+
+    def get_lang(self):
+        """
+        Get the language associated with this word file, if any.
+        """
+        return self.lang
 
     def get_words(self):
         """
