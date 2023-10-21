@@ -13,7 +13,7 @@ Download the repo and run `pip install --user .` in the top level of the repo.
 
 # Running the program
 
-Run `/language-practice path/to/toml/file.toml` to start the program. This may take
+Run `language-practice path/to/toml/file.toml` to start the program. This may take
 some time if you are using conjugation or declension charts as it will pull them in
 parallel from the internet. An internet connection is only required for this part
 of the execution.
