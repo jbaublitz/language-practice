@@ -9,6 +9,7 @@ from requests import get
 
 from language_practice.web import fr
 from language_practice.web import ru
+from language_practice.web import uk
 
 URL = "https://en.wiktionary.org/wiki/"
 
@@ -30,6 +31,8 @@ def refresh(word, lang):
             return fr.parse(html)
         if lang == "ru":
             return ru.parse(html)
+        if lang == "uk":
+            return uk.parse(html)
         raise RuntimeError(
             "Reached a condition that should be unreachable; please file a bug"
         )
@@ -54,6 +57,8 @@ async def fetch(session, word, lang):
             if lang == "fr":
                 return (word, fr.parse(html))
             if lang == "ru":
+                return (word, ru.parse(html))
+            if lang == "uk":
                 return (word, ru.parse(html))
             raise RuntimeError(
                 "Reached a condition that should be unreachable; please file a bug"
