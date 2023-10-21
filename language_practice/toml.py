@@ -68,7 +68,7 @@ class TomlConfig:
             with open(file_path, "rb") as file_handle:
                 toml = load(file_handle)
                 lang = toml["lang"]
-                if lang is not None and lang not in ["fr", "ru"]:
+                if lang is not None and lang not in ["fr", "uk", "ru"]:
                     raise RuntimeError(
                         f"Language {lang} is not supported; if you would like it to "
                         "be, please open a feature request!"

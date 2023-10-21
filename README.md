@@ -5,7 +5,7 @@ Flashcard terminal app with spaced repetition
 ## Languages supported
 
 While any language with gender or verb aspect can be used, declension/verb conjugation
-charts are currently only supported for Russian and French.
+charts are currently only supported for Ukrainian, Russian and French.
 
 ## Installing
 
@@ -32,8 +32,8 @@ The file format is TOML.
 
 ### Top level options
 
-* `lang`: Accepts `ru` and `fr` as values if you would like to pull conjugation or
-declension charts from Wiktionary. Not specifying this value does not pull charts
+* `lang`: Accepts `uk`, `ru` and `fr` as values if you would like to pull conjugation
+or declension charts from Wiktionary. Not specifying this value does not pull charts
 and runs in flashcard-only mode.
 
 ### Words
