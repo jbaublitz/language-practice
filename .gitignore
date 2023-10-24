@@ -4,3 +4,4 @@
 *.toml
 *egg-info
 build
+dist
