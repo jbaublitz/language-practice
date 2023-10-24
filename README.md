@@ -9,6 +9,10 @@ charts are currently only supported for Ukrainian, Russian and French.
 
 ## Installing
 
+### Pip 
+Run `pip install --user language-practice`.
+
+### From source
 Download the repo and run `pip install --user .` in the top level of the repo.
 
 # Running the program
