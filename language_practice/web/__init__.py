@@ -59,7 +59,7 @@ async def fetch(session, word, lang):
             if lang == "ru":
                 return (word, ru.parse(html))
             if lang == "uk":
-                return (word, ru.parse(html))
+                return (word, uk.parse(html))
             raise RuntimeError(
                 "Reached a condition that should be unreachable; please file a bug"
             )
