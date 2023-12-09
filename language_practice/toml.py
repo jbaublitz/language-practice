@@ -17,6 +17,7 @@ class TomlEntry:
             self.aspect = dct.get("aspect")
             self.usage = dct.get("usage")
             self.part_of_speech = dct.get("part_of_speech")
+            self.charts = dct.get("charts")
         except KeyError as err:
             error = f"Key {err} not found"
             if hasattr(self, "word"):
@@ -56,6 +57,12 @@ class TomlEntry:
             ret = f"[{self.gender}] " + ret
 
         return ret
+
+    def get_charts(self):
+        """
+        Get the inflection charts as a list of lists.
+        """
+        return self.charts
 
 
 class TomlConfig:
