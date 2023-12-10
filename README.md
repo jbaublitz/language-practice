@@ -9,6 +9,10 @@ charts are currently only supported for Ukrainian, Russian and French.
 
 ## Installing
 
+### Minimum Python version
+This application relies heavily on the TOML format so Python 3.11 is the minimum
+supported Python version.
+
 ### Pip 
 Run `pip install --user language-practice`.
 
