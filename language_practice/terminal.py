@@ -1,6 +1,7 @@
 """
 Terminal application interface.
 """
+
 import os
 import sys
 import termios

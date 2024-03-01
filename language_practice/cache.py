@@ -1,6 +1,7 @@
 """
 Handles caching for web scraped data.
 """
+
 import json
 from json.decoder import JSONDecodeError
 

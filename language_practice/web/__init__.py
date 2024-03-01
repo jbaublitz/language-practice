@@ -1,6 +1,7 @@
 """
 Handles web scraping.
 """
+
 import asyncio
 
 import aiohttp

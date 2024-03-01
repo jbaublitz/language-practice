@@ -2,7 +2,6 @@
 Parsing for Ukrainian language grammar charts.
 """
 
-
 from language_practice.web.shared import uk_ru_tables
 
 

@@ -1,6 +1,7 @@
 """
 Handles TOML parsing from the configuration file.
 """
+
 from tomllib import load
 
 
