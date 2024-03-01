@@ -82,9 +82,11 @@ class Repetition:
         try:
             with open(self.repetition_path, "r", encoding="utf-8") as file_handle:
                 lst = json.loads(file_handle.read())
-                self.all_words = set(dct["word"] for dct in lst)
+                self.all_words = set(dct["word"] for dct in lst if dct["word"] in words)
                 self.repetitions = deque(
-                    WordRepetition(rep_dct["word"], rep_dct) for rep_dct in lst
+                    WordRepetition(rep_dct["word"], rep_dct)
+                    for rep_dct in lst
+                    if rep_dct["word"] in words
                 )
         except IOError:
             self.repetitions = deque(WordRepetition(word) for word in words)
