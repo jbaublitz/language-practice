@@ -6,6 +6,7 @@ import os
 import sys
 import termios
 import tty
+from functools import reduce
 
 from tabulate import tabulate
 
@@ -20,11 +21,25 @@ class Application:
     Handles the interactive user input from the terminal.
     """
 
-    def __init__(self, word_path, reset):
-        if not word_path.endswith(".toml"):
-            raise RuntimeError("Word file needs to be a TOML file")
+    def __init__(self, word_path, is_dir, reset):
+        if is_dir:
+            (directory, _, files) = next(os.walk(word_path))
+            self.words = reduce(
+                lambda toml1, toml2: toml1.extend(toml2),
+                [
+                    TomlConfig(f"{directory}/{file}")
+                    for file in files
+                    if file.endswith(".toml")
+                ],
+            )
+            name = "directory"
+        else:
+            if not word_path.endswith(".toml"):
+                raise RuntimeError("Word file needs to be a TOML file")
 
-        (name, _) = os.path.splitext(word_path)
+            (name, _) = os.path.splitext(word_path)
+            self.words = TomlConfig(word_path)
+
         repetition_path = f"{name}-repetition.json"
         cache_path = f"{name}-cache.json"
 
