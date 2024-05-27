@@ -27,10 +27,13 @@ parallel from the internet. An internet connection is only required for this par
 of the execution.
 
 Command line options:
-* `--traceback`: useful for bug reporting, bubbles the Python exception up to the
+* `-t`/`--traceback`: useful for bug reporting, bubbles the Python exception up to the
 terminal
-* `--reset`: Redownload the entire cache and current information about what words you
+* `-r`/`--reset`: Redownload the entire cache and current information about what words you
 have guessed correctly/incorrectly
+* `-f`/`--file`: Path to the file containing the flashcard information
+* `-d`/`--dir`: File is a directory and all TOML files in the given directory should be loaded
+by the application
 
 Run ctrl-C to exit the program and save your progress
 
