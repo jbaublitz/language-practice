@@ -1,3 +1,11 @@
+# 0.2.0
+
+## Enhancements
+* Ability to specify a directory as the source of the flashcard files
+
+## Breaking changes
+* Word file is no longer a positional argument
+
 # 0.1.5
 
 ## Bug fixes
