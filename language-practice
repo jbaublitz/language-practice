@@ -8,40 +8,50 @@ Flash card app built for the Russian language.
 Inflection charts are pulled from wiktionary.
 """
 
+import argparse
 import asyncio
 import sys
 
 from language_practice.terminal import Application
 
 
+class Once(argparse.Action):
+    """
+    Action in parser to allow only a single instance of a given argument.
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if getattr(namespace, self.dest, None) is not None:
+            raise argparse.ArgumentError(
+                self, f"Only one instance of {self.dest} allowed"
+            )
+
+        setattr(namespace, self.dest, values)
+
+
 def main():
     """
     Main function
     """
-    traceback = False
-    reset = False
+    parse = argparse.ArgumentParser(
+        prog="language-practice", description="Flashcard app"
+    )
+    parse.add_argument("-t", "--traceback", action="store_true")
+    parse.add_argument("-r", "--reset", action="store_true")
+    parse.add_argument("-f", "--file", action=Once, required=True)
+    parse.add_argument("-d", "--dir", action="store_true")
+    args = parse.parse_args()
+
     try:
-        if "--traceback" in sys.argv:
-            traceback = True
-            sys.argv.remove("--traceback")
-
-        if "--reset" in sys.argv:
-            reset = True
-            sys.argv.remove("--reset")
-
-        try:
-            word_file = sys.argv[1]
-        except IndexError as err:
-            print("USAGE: language-practice [--reset] [--traceback] <WORD_FILE.toml>")
-            raise RuntimeError(
-                "Missing required argument for path to word file"
-            ) from err
-
-        app = Application(word_file, reset)
+        app = Application(
+            args.file,
+            args.dir,
+            args.reset,
+        )
         asyncio.run(app.startup())
         app.run()
     except Exception as err:  # pylint: disable=broad-exception-caught
-        if traceback:
+        if args.traceback:
             raise err
 
         print(f"{err}")

@@ -106,3 +106,16 @@ class TomlConfig:
         Get a list of all words in the TOML file.
         """
         return list(self.words.keys())
+
+    def extend(self, toml):
+        """
+        Extend a TOML config with another TOML config.
+        """
+        if self.lang != toml.lang:
+            raise RuntimeError(
+                f"Attempted to join a TOML config with lang {self.lang} with \
+                one with lang {toml.lang}"
+            )
+
+        self.words.update(toml.words)
+        return self

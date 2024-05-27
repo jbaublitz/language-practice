@@ -2,8 +2,8 @@
 Handles spaced repetition.
 """
 
-from collections import deque
 import json
+from collections import deque
 from random import shuffle
 
 
