@@ -37,11 +37,12 @@ class Application:
             if not word_path.endswith(".toml"):
                 raise RuntimeError("Word file needs to be a TOML file")
 
-            (name, _) = os.path.splitext(word_path)
             self.words = TomlConfig(word_path)
+            (name, _) = os.path.splitext(os.path.basename(word_path))
+            directory = os.path.dirname(word_path)
 
-        repetition_path = f"{name}-repetition.json"
-        cache_path = f"{name}-cache.json"
+        repetition_path = f"{directory}/{name}-repetition.json"
+        cache_path = f"{directory}/{name}-cache.json"
 
         if reset:
             try:
@@ -53,7 +54,6 @@ class Application:
         self.settings = termios.tcgetattr(sys.stdin.fileno())
 
         self.cache = Cache(cache_path)
-        self.words = TomlConfig(word_path)
         self.lang = self.words.get_lang()
         self.repetition = Repetition(repetition_path, self.words.get_words())
 
