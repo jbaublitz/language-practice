@@ -1,3 +1,8 @@
+# 0.2.1
+
+## Bug fixes
+* Fixed bug in directory feature
+
 # 0.2.0
 
 ## Enhancements
