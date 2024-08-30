@@ -3,27 +3,29 @@ Handles web scraping.
 """
 
 import asyncio
+from typing import Any
 
 import aiohttp
 from bs4 import BeautifulSoup
 from requests import get
 
+from language_practice.config import Entry
 from language_practice.web import fr, ru, uk
 
 URL = "https://en.wiktionary.org/wiki/"
 
 
-def refresh(word, lang):
+def refresh(word: str, lang: str | None) -> list[list[list[str]]]:
     """
     Refresh individual cache entry.
     """
     if lang is None:
-        return {}
+        return []
 
     try:
         response = get(URL + word.replace("\u0301", ""), timeout=5)
         if response.status_code == 404:
-            return {}
+            return []
         html = BeautifulSoup(response.text, "html.parser")
 
         if lang == "fr":
@@ -39,17 +41,19 @@ def refresh(word, lang):
         raise RuntimeError(f"Error fetching word {word}") from err
 
 
-async def fetch(session, word, lang):
+async def fetch(
+    session: aiohttp.ClientSession, word: str, lang: str | None
+) -> tuple[str, list[list[list[str]]]]:
     """
     Fetch individual word asynchronously.
     """
     if lang is None:
-        return (word, {})
+        return (word, [])
 
     try:
         async with session.get(URL + word.replace("\u0301", "")) as response:
             if response.status == 404:
-                return (word, {})
+                return (word, [])
             text = await response.text()
             html = BeautifulSoup(text, "html.parser")
 
@@ -66,14 +70,18 @@ async def fetch(session, word, lang):
         raise RuntimeError(f"Error fetching word {word}") from err
 
 
-async def scrape(words, cache, lang):
+async def scrape(
+    words: list[Entry], lang: str | None
+) -> dict[str, list[list[list[str]]]]:
     """
     Fetch all words asynchronously.
     """
     async with aiohttp.ClientSession() as session:
-        words_not_in_cache = [word for word in words if word not in cache]
         ret = await asyncio.gather(
-            *[fetch(session, word, lang) for word in words_not_in_cache]
+            *[fetch(session, word.get_word(), lang) for word in words]
         )
+        scraped_info = {}
         for word, info in ret:
-            cache[word] = info
+            scraped_info[word] = info
+
+        return scraped_info

@@ -2,9 +2,8 @@
 Handles spaced repetition.
 """
 
-import json
-from collections import deque
-from random import shuffle
+import math
+from datetime import date, timedelta
 
 
 class WordRepetition:
@@ -12,126 +11,85 @@ class WordRepetition:
     Information on a single word's repetition frequency.
     """
 
-    def __init__(self, word, dct=None):
-        self.word = word
+    DEFAULT_EASYNESS_FACTOR = 2.5
 
-        self.correct = dct["correct"] if dct is not None else 0
-        self.incorrect = dct["incorrect"] if dct is not None else 0
-        self.incorrect_since_ten_correct = (
-            dct["incorrect_since_ten_correct"] if dct is not None else 0
+    #  pylint: disable=too-many-arguments
+    def __init__(
+        self,
+        easiness_factor: float,
+        num_correct: int,
+        in_n_days: int,
+        date_of_next: date,
+        should_review: bool,
+    ):
+        self.easiness_factor = easiness_factor
+        self.num_correct = num_correct
+        self.in_n_days = in_n_days
+        self.date_of_next = date_of_next
+        self.should_review = should_review
+
+    def grade(self, grade: int):
+        """
+        Grade workflow.
+        """
+        if grade >= 3:
+            if self.num_correct == 0:
+                self.in_n_days = 1
+                self.date_of_next = date.today() + timedelta(days=self.in_n_days)
+            elif self.num_correct == 1:
+                self.in_n_days = 6
+                self.date_of_next = date.today() + timedelta(days=self.in_n_days)
+            else:
+                self.in_n_days = math.ceil(self.in_n_days * self.easiness_factor)
+                self.date_of_next = date.today() + timedelta(days=self.in_n_days)
+            self.num_correct += 1
+
+            if grade < 4:
+                self.should_review = True
+        else:
+            self.num_correct = 0
+            self.in_n_days = 1
+            self.date_of_next = date.today() + timedelta(days=self.in_n_days)
+            self.should_review = True
+
+        self.easiness_factor = max(
+            1.3,
+            self.easiness_factor + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02)),
         )
 
-    def get_word(self):
+    def review(self, grade: int):
         """
-        Get the word associated with repetition data.
+        Review workflow.
         """
-        return self.word
+        if grade >= 4:
+            self.should_review = False
 
-    def mark_correct(self):
+    def get_easiness_factor(self) -> float:
         """
-        Mark entry as correctly guessed.
+        Get easiness factor.
         """
-        self.correct += 1
-        self.incorrect = 0
-        if self.correct >= 10:
-            self.incorrect_since_ten_correct = 0
+        return self.easiness_factor
 
-    def mark_incorrect(self):
+    def get_num_correct(self) -> int:
         """
-        Mark entry as incorrectly guessed.
+        Get number correct.
         """
-        self.incorrect += 1
-        self.correct = 0
-        self.incorrect_since_ten_correct += 1
+        return self.num_correct
 
-    def repeat_in(self):
+    def get_in_n_days(self) -> int:
         """
-        Get number of flashcards until this one should be repeated again.
+        Get the number of days in which a card should repeat.
         """
-        index = 15
-        if self.correct == 0:
-            index = max(index - self.incorrect, 1)
-        elif self.incorrect == 0:
-            index = max(index - self.incorrect_since_ten_correct, 1)
-            index *= self.correct
+        return self.in_n_days
 
-        return index
-
-    def save(self):
+    def get_date_of_next(self) -> date:
         """
-        Save repetition data.
+        Get the date on which a card should repeat.
         """
-        return {
-            "word": self.word,
-            "correct": self.correct,
-            "incorrect": self.incorrect,
-            "incorrect_since_ten_correct": self.incorrect_since_ten_correct,
-        }
+        return self.date_of_next
 
-
-class Repetition:
-    """
-    All repetition data for words in configuration file.
-    """
-
-    def __init__(self, path, words):
-        self.repetition_path = path
-
-        shuffle(words)
-
-        try:
-            with open(self.repetition_path, "r", encoding="utf-8") as file_handle:
-                lst = json.loads(file_handle.read())
-                self.all_words = set(dct["word"] for dct in lst if dct["word"] in words)
-                self.repetitions = deque(
-                    WordRepetition(rep_dct["word"], rep_dct)
-                    for rep_dct in lst
-                    if rep_dct["word"] in words
-                )
-        except IOError:
-            self.repetitions = deque(WordRepetition(word) for word in words)
-            self.all_words = set(words)
-        except json.JSONDecodeError:
-            self.repetitions = deque(WordRepetition(word) for word in words)
-            self.all_words = set(words)
-        except KeyError:
-            self.repetitions = deque(WordRepetition(word) for word in words)
-            self.all_words = set(words)
-        except TypeError:
-            self.repetitions = deque(WordRepetition(word) for word in words)
-            self.all_words = set(words)
-
-        for word in words:
-            if word not in self.all_words:
-                self.repetitions.insert(0, WordRepetition(word))
-
-    def peek(self):
+    def get_review(self) -> bool:
         """
-        Peek at current word entry.
+        Get whether card should be reviewed.
         """
-        return self.repetitions[0].get_word() if len(self.repetitions) > 0 else None
-
-    def incorrect(self):
-        """
-        Mark as incorrectly guessed.
-        """
-        elem = self.repetitions.popleft()
-        elem.mark_incorrect()
-        index = elem.repeat_in()
-        self.repetitions.insert(min(index, len(self.repetitions)), elem)
-
-    def correct(self):
-        """
-        Mark as correctly guessed.
-        """
-        elem = self.repetitions.popleft()
-        elem.mark_correct()
-        index = elem.repeat_in()
-        self.repetitions.insert(min(index, len(self.repetitions)), elem)
-
-    def save(self):
-        """
-        Save repetition data for all words.
-        """
-        with open(self.repetition_path, "w", encoding="utf-8") as file_handle:
-            file_handle.write(json.dumps([item.save() for item in self.repetitions]))
+        return self.should_review

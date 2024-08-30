@@ -2,13 +2,13 @@
 Parsing for French language grammar charts.
 """
 
+from bs4 import BeautifulSoup
 
-def parse(html):
+
+def parse(html: BeautifulSoup) -> list[list[list[str]]]:
     """
     Parse HTML returned from web request for a French word.
     """
-    cache = {}
-
     all_tables = html.find_all("table", {"class": "inflection-table"})
     tables = [table for table in all_tables if table.select(".lang-fr") != []]
 
@@ -26,11 +26,9 @@ def parse(html):
             for tr in table.find_all("tr")
         ]
         charts.append(chart)
-    if charts:
-        cache["charts"] = charts
 
     adj_forms = html.select(".form-of.lang-fr")
     if adj_forms:
-        cache["adjective_forms"] = [adj.text for adj in adj_forms]
+        charts.append([[adj.text for adj in adj_forms]])
 
-    return cache
+    return charts
