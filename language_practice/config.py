@@ -16,6 +16,7 @@ class Entry:
     """
 
     #  pylint: disable=too-many-arguments
+    #  pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         word: str,
@@ -24,7 +25,7 @@ class Entry:
         aspect: str | None,
         usage: str | None,
         part_of_speech: str | None,
-        charts: list[list[list[str]]] | None,
+        charts: list[list[str]] | None,
         repetition: WordRepetition,
     ):
         self.word = word
@@ -72,7 +73,7 @@ class Entry:
         """
         return self.part_of_speech
 
-    def get_charts(self) -> list[list[list[str]]] | None:
+    def get_charts(self) -> list[list[str]] | None:
         """
         Get charts.
         """
@@ -118,8 +119,8 @@ class Config:
         """
         if self.lang != config.lang:
             raise RuntimeError(
-                f"Attempted to join a TOML config with lang {self.lang} with \
-                one with lang {config.lang}"
+                f"Attempted to join a TOML config with lang {self.lang} with"
+                f"one with lang {config.lang}"
             )
 
         self.words += config.words
