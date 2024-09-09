@@ -3,6 +3,7 @@ Terminal application interface.
 """
 
 import os
+from sqlite3 import IntegrityError
 import tomllib
 from uuid import uuid4
 
@@ -14,8 +15,6 @@ from textual.containers import (
     ScrollableContainer,
     Vertical,
 )
-from textual.css.query import NoMatches
-from textual.dom import DOMNode
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -71,10 +70,7 @@ class TerminalApplication(App):
             args.append(
                 Horizontal(
                     Checkbox(id=f"select-{hex_string}"),
-                    Container(),
                     Label(flashcard_set),
-                    Container(),
-                    Button("Delete", id=f"delete-{hex_string}"),
                     classes="flashcard-set",
                 )
             )
@@ -82,6 +78,7 @@ class TerminalApplication(App):
         yield Horizontal(
             Container(),
             Button("Import", id="import"),
+            Button("Delete", id="delete"),
             Button("Select all", id="select_all"),
             Button("Start", id="start"),
             Button("Exit", id="exit"),
@@ -89,13 +86,14 @@ class TerminalApplication(App):
             classes="bottom-buttons-one",
         )
 
-    def on_start(self):
+    async def on_start(self):
         """
         On start button press.
         """
         scrollable = self.query_one("#scrollable")
         checkboxes = map(lambda child: child.query_one(Checkbox), scrollable.children)
         config = None
+        screens = []
         for checkbox in checkboxes:
             if checkbox.value:
                 checkbox_id = checkbox.id
@@ -106,19 +104,37 @@ class TerminalApplication(App):
                     if config is None:
                         config = self.handle.load_config(name)
                     else:
-                        config = config.extend(self.handle.load_config(name))
+                        try:
+                            config = config.extend(self.handle.load_config(name))
+                        except RuntimeError as err:
+                            screens.append(
+                                AlertWindow(f"Failed to use file {name}\n{err}")
+                            )
+                            continue
+
         if config is not None:
             self.flashcard = Flashcard(self.handle, config.get_words())
-            self.push_screen(StudyScreen(self.flashcard))
+            await self.push_screen(StudyScreen(self.flashcard))
+            for screen in screens:
+                await self.push_screen(screen)
 
-    def on_delete(self, button_id: str, parent: DOMNode | None):
+    def on_delete(self):
         """
         On delete button press.
         """
-        name = bytes.fromhex(button_id.split("delete-")[1]).decode("utf-8")
-        self.handle.delete_set(name)
-        if parent is not None:
-            parent.remove()  # type: ignore
+        scrollable = self.query_one("#scrollable")
+        checkboxes = map(lambda child: child.query_one(Checkbox), scrollable.children)
+        for checkbox in checkboxes:
+            if checkbox.value:
+                checkbox_id = checkbox.id
+                if checkbox_id is not None:
+                    name = bytes.fromhex(checkbox_id.split("select-")[1]).decode(
+                        "utf-8"
+                    )
+                    set_id = self.handle.get_id_from_file_name(name)
+                    if set_id is not None:
+                        self.handle.delete_set(set_id)
+                    checkbox.parent.remove()
 
     def on_exit_study(self):
         """
@@ -133,38 +149,43 @@ class TerminalApplication(App):
         """
         On complete import button press.
         """
+        await self.pop_screen()
         toml = None
         for import_file in self.imports:
             try:
                 toml = TomlConfig(import_file)
-            except tomllib.TOMLDecodeError:
-                self.pop_screen()
+            except tomllib.TOMLDecodeError as err:
+                self.push_screen(AlertWindow(f"{import_file}: {err}"))
+                continue
+            except UnicodeDecodeError as err:
+                self.push_screen(AlertWindow(f"{import_file}: {err}"))
+                continue
 
+            new = False
             if toml is not None:
-                self.handle.import_set(
-                    import_file,
-                    toml,
-                    await scrape(toml.get_words(), toml.get_lang()),
-                )
+                try:
+                    new = self.handle.import_set(
+                        import_file,
+                        toml,
+                        await scrape(toml.get_words(), toml.get_lang()),
+                    )
+                except IntegrityError as err:
+                    set_id = self.handle.get_id_from_file_name(import_file)
+                    if set_id is not None:
+                        self.handle.delete_set(set_id)
+                    self.push_screen(AlertWindow(f"{import_file}: {err}"))
+                    continue
 
             hex_string = import_file.encode("utf-8").hex()
             scrollable = self.query_one("#scrollable")
-            try:
-                scrollable.query_one(f"#delete-{hex_string}")
-            except NoMatches:
+            if new:
                 scrollable.mount(
                     Horizontal(
                         Checkbox(id=f"select-{hex_string}"),
-                        Container(),
                         Label(import_file),
-                        Container(),
-                        Button("Delete", id=f"delete-{hex_string}"),
+                        classes="flashcard-set",
                     )
                 )
-
-        self.pop_screen()
-
-        self.imports = {}
 
     #  pylint: disable=too-many-branches
     async def on_button_pressed(self, event: Button.Pressed):
@@ -174,11 +195,12 @@ class TerminalApplication(App):
         button_id = event.button.id
         if button_id is not None:
             if button_id == "import":
+                self.imports = {}
                 self.push_screen(ImportPopup())
             elif button_id == "start":
-                self.on_start()
-            elif button_id.startswith("delete"):
-                self.on_delete(button_id, event.button.parent)
+                await self.on_start()
+            elif button_id == "delete":
+                self.on_delete()
             elif button_id == "exit":
                 self.exit()
             elif button_id == "exit_study":
@@ -394,3 +416,32 @@ class StudyScreen(ModalScreen):
             await self.grade(4)
         elif event.button.id == "five":
             await self.grade(5)
+
+
+class AlertWindow(ModalScreen):
+    """
+    Alert window showing an error that occurred.
+    """
+
+    def __init__(self, message, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.message = message
+
+    def compose(self):
+        yield Vertical(
+            Container(),
+            Horizontal(Container(), Label(self.message), Container()),
+            Container(),
+        )
+
+    def key_enter(self):
+        """
+        Handle enter key press.
+        """
+        self.dismiss()
+
+    def on_click(self):
+        """
+        Handle mouse click.
+        """
+        self.dismiss()

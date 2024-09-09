@@ -14,6 +14,7 @@ class WordRepetition:
     DEFAULT_EASYNESS_FACTOR = 2.5
 
     #  pylint: disable=too-many-arguments
+    #  pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         easiness_factor: float,
@@ -40,7 +41,7 @@ class WordRepetition:
                 self.in_n_days = 6
                 self.date_of_next = date.today() + timedelta(days=self.in_n_days)
             else:
-                self.in_n_days = math.ceil(self.in_n_days * self.easiness_factor)
+                self.in_n_days = math.floor(self.in_n_days * self.easiness_factor)
                 self.date_of_next = date.today() + timedelta(days=self.in_n_days)
             self.num_correct += 1
 
