@@ -11,9 +11,7 @@ Inflection charts are pulled from wiktionary.
 import argparse
 import sys
 
-from language_practice.gui import GuiApplication
 from language_practice.sqlite import SqliteHandle
-from language_practice.terminal import TerminalApplication
 
 
 class Once(argparse.Action):
@@ -53,9 +51,11 @@ def main():
     try:
         all_sets = handle.get_all_sets()
         if args.gui:
-            gui = GuiApplication(handle, all_sets)
+            from language_practice.gui import GuiApplication  # pylint: disable=import-outside-toplevel
+            gui = GuiApplication(handle, all_sets, application_id="me.jbaublitz.LanguagePractice")
             gui.run()
         else:
+            from language_practice.terminal import TerminalApplication  # pylint: disable=import-outside-toplevel
             tui = TerminalApplication(handle, all_sets)
             tui.run()
     except Exception as err:  # pylint: disable=broad-exception-caught
