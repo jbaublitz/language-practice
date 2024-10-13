@@ -6,6 +6,7 @@ Graphical user interface.
 #  pylint: disable=too-few-public-methods
 
 import asyncio
+from sqlite3 import IntegrityError
 import tomllib
 from typing import Self
 
@@ -62,10 +63,8 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.flashcard_set_grid = FlashcardSetGrid()
         for flashcard_set in flashcard_sets:
-            delete_button = Gtk.Button(label="Delete")
-            delete_button.connect("clicked", self.delete_flashcard_set)
             self.flashcard_set_grid.add_row(
-                Gtk.CheckButton(), Gtk.Label.new(flashcard_set), delete_button
+                Gtk.CheckButton(), Gtk.Label.new(flashcard_set)
             )
         scrollable = Gtk.ScrolledWindow()
         scrollable.set_size_request(700, 600)
@@ -75,6 +74,9 @@ class MainWindow(Gtk.ApplicationWindow):
         import_button = Gtk.Button(label="Import")
         import_button.connect("clicked", self.import_button)
         button_hbox.append(import_button)
+        delete_button = Gtk.Button(label="Delete")
+        delete_button.connect("clicked", self.delete_flashcard_set)
+        button_hbox.append(delete_button)
         select_all_button = Gtk.Button(label="Select all")
         select_all_button.connect("clicked", self.flashcard_set_grid.select_all)
         button_hbox.append(select_all_button)
@@ -96,12 +98,18 @@ class MainWindow(Gtk.ApplicationWindow):
         file_dialog = Gtk.FileDialog()
         file_dialog.open_multiple(callback=self.handle_files)
 
+    #  pylint: disable=unused-argument
     def delete_flashcard_set(self, button: Gtk.Button):
         """
         Handle deleting flashcard set on button press.
         """
-        self.handle.delete_set(button.get_prev_sibling().get_text())
-        self.flashcard_set_grid.delete_row(button)
+        selected = self.flashcard_set_grid.get_selected()
+        selected.sort(reverse=True, key=lambda info: info[1])
+        for text, row in selected:
+            set_id = self.handle.get_id_from_file_name(text)
+            if set_id is not None:
+                self.handle.delete_set(set_id)
+            self.flashcard_set_grid.delete_row(row)
 
     def handle_files(self, dialog: Gtk.FileDialog, task: Gio.Task):
         """
@@ -111,20 +119,40 @@ class MainWindow(Gtk.ApplicationWindow):
         for current_import in self.imports:
             try:
                 toml = TomlConfig(current_import)
-            except tomllib.TOMLDecodeError:
+            except tomllib.TOMLDecodeError as err:
+                dialog = Gtk.AlertDialog()
+                dialog.set_message(f"{current_import}: {err}")
+                dialog.set_modal(True)
+                dialog.choose()
+                continue
+            except UnicodeDecodeError as err:
+                dialog = Gtk.AlertDialog()
+                dialog.set_message(f"{current_import}: {err}")
+                dialog.set_modal(True)
+                dialog.choose()
                 continue
 
-            self.handle.import_set(
-                current_import,
-                toml,
-                asyncio.run(scrape(toml.get_words(), toml.get_lang())),
-            )
+            try:
+                new = self.handle.import_set(
+                    current_import,
+                    toml,
+                    asyncio.run(scrape(toml.get_words(), toml.get_lang())),
+                )
+            except IntegrityError as err:
+                dialog = Gtk.AlertDialog()
+                dialog.set_message(f"{current_import}: {err}")
+                dialog.set_modal(True)
+                dialog.choose()
+                set_id = self.handle.get_id_from_file_name(current_import)
+                if set_id is not None:
+                    self.handle.delete_set(set_id)
+                continue
 
-            delete_button = Gtk.Button(label="Delete")
-            delete_button.connect("clicked", self.delete_flashcard_set)
-            self.flashcard_set_grid.add_row(
-                Gtk.CheckButton(), Gtk.Label.new(current_import), delete_button
-            )
+            if new:
+                self.flashcard_set_grid.add_row(
+                    Gtk.CheckButton(),
+                    Gtk.Label.new(current_import),
+                )
         self.imports = []
 
     #  pylint: disable=unused-argument
@@ -134,11 +162,11 @@ class MainWindow(Gtk.ApplicationWindow):
         """
         files = self.flashcard_set_grid.get_selected()
         config = None
-        for file in files:
+        for text, _ in files:
             if config is None:
-                config = self.handle.load_config(file)
+                config = self.handle.load_config(text)
             else:
-                config = config.extend(self.handle.load_config(file))
+                config = config.extend(self.handle.load_config(text))
 
         if config is not None:
             self.flashcard = Flashcard(self.handle, config.get_words())
@@ -167,23 +195,20 @@ class FlashcardSetGrid(Gtk.Grid):
         self.set_column_spacing(10)
         self.num_rows = 0
 
-    def add_row(
-        self, checkbox: Gtk.CheckButton, label: Gtk.Label, delete_button: Gtk.Button
-    ):
+    def add_row(self, checkbox: Gtk.CheckButton, label: Gtk.Label):
         """
         Add a row to the grid.
         """
         self.attach(checkbox, 0, self.num_rows, 1, 1)
         self.attach(label, 1, self.num_rows, 1, 1)
-        self.attach(delete_button, 2, self.num_rows, 1, 1)
         self.num_rows += 1
 
-    def delete_row(self, contains_child: Gtk.Button):
+    def delete_row(self, row):
         """
         Delete a row from the grid.
         """
-        info = self.query_child(contains_child)
-        self.remove_row(info.row)
+        self.remove_row(row)
+        self.num_rows -= 1
 
     #  pylint: disable=unused-argument
     def select_all(self, button: Gtk.Button):
@@ -194,14 +219,14 @@ class FlashcardSetGrid(Gtk.Grid):
             self.get_child_at(0, row).set_active(True)
 
     #  pylint: disable=unused-argument
-    def get_selected(self) -> list[str]:
+    def get_selected(self) -> list[tuple[str, int]]:
         """
         Get all selected flashcard sets.
         """
         files = []
         for row in range(self.num_rows):
             if self.get_child_at(0, row).get_active():
-                files.append(self.get_child_at(1, row).get_text())
+                files.append((self.get_child_at(1, row).get_text(), row))
 
         return files
 
@@ -213,6 +238,7 @@ class StudyWindow(Gtk.ApplicationWindow):
 
     def __init__(self, flashcard: Flashcard, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.set_title("Language Practice")
         self.flashcard = flashcard
 
         (self.peek, self.is_review) = self.flashcard.current()
