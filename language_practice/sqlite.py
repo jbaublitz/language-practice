@@ -118,18 +118,14 @@ class SqliteHandle:
 
         words_to_delete = current_words - config_words
         for word in words_to_delete:
-            self.delete(SqliteHandle.WORD_TABLE_NAME, "word = '{word}'")
+            self.delete(SqliteHandle.WORD_TABLE_NAME, f"word = '{word}'")
             res = self.cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table';"
+                f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' WHERE word='{word}';"
             )
-            names = res.fetchall()
-            names_to_drop = [
-                name[0]
-                for name in names
-                if name[0] != "" and not name[0].isspace() and name[0].startswith(word)
-            ]
-            for name in names_to_drop:
-                self.drop_table(name)
+            table_uuids = res.fetchone()[0]
+            if table_uuids is not None:
+                for table_uuid in table_uuids.split(","):
+                    self.drop_table(table_uuid)
 
     #  pylint: disable=too-many-branches
     #  pylint: disable=too-many-statements
@@ -236,7 +232,9 @@ class SqliteHandle:
         else:
             final_charts = [charts]
 
-        res = self.cursor.execute(f"SELECT table_uuids FROM words WHERE word='{word}';")
+        res = self.cursor.execute(
+            f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' where word = '{word}';"
+        )
         table_uuids = res.fetchone()[0]
         if table_uuids is not None:
             for table_uuid in table_uuids.split(","):
@@ -332,7 +330,8 @@ class SqliteHandle:
         Delete a set from the database.
         """
         res = self.cursor.execute(
-            f"SELECT table_uuids FROM 'words' WHERE flashcard_set_id = {set_id};"
+            f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' WHERE "
+            f"flashcard_set_id = {set_id};"
         )
         for uuids in res:
             if uuids[0] is not None:
