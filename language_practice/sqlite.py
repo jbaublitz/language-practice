@@ -265,6 +265,8 @@ class SqliteHandle:
                             values.append(f"'{val}'")
                     self.insert_into(table_uuid, ", ".join(columns), ", ".join(values))
 
+        word = word.replace("'", "''")
+
         set_statements = [
             f"word = '{word}'",
             f"definition = '{definition}'",
@@ -413,6 +415,7 @@ class SqliteHandle:
         in_n_days = repetition.get_in_n_days()
         date_of_next = str(repetition.get_date_of_next())
         review = 1 if repetition.get_review() else 0
+        word = word.replace("'", "''")
         self.update(
             SqliteHandle.WORD_TABLE_NAME,
             f"easiness_factor = {easiness_factor}, num_correct = {num_correct}, "
