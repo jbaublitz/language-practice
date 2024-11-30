@@ -18,6 +18,10 @@ def uk_ru_tables(tables: list[Any], remove: str) -> list[list[list[str]]]:
             for tr in table.find_all("tr")
             if [entry.text.strip() for entry in tr.find_all("td")] != []
         ]
+        max_len = max(map(len, chart))
+        for chart_line in chart:
+            for _ in range(0, max_len - len(chart_line)):
+                chart_line.insert(1, "")
 
         charts.append(chart)
 
