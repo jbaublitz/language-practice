@@ -122,9 +122,9 @@ class SqliteHandle:
             res = self.cursor.execute(
                 f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' WHERE word='{word}';"
             )
-            table_uuids = res.fetchone()[0]
+            table_uuids = res.fetchone()
             if table_uuids is not None:
-                for table_uuid in table_uuids.split(","):
+                for table_uuid in table_uuids[0].split(","):
                     self.drop_table(table_uuid)
 
     #  pylint: disable=too-many-branches
@@ -235,9 +235,9 @@ class SqliteHandle:
         res = self.cursor.execute(
             f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' where word = '{word}';"
         )
-        table_uuids = res.fetchone()[0]
+        table_uuids = res.fetchone()
         if table_uuids is not None:
-            for table_uuid in table_uuids.split(","):
+            for table_uuid in table_uuids[0].split(","):
                 self.drop_table(table_uuid)
 
         table_uuids = []
