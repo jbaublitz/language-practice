@@ -11,7 +11,7 @@ Inflection charts are pulled from wiktionary.
 import argparse
 import sys
 
-from language_practice.sqlite import SqliteHandle
+from language_practice.gui import GuiApplication
 
 
 class Once(argparse.Action):
@@ -36,40 +36,19 @@ def main():
         prog="language-practice", description="Flashcard app"
     )
     parse.add_argument("-t", "--traceback", action="store_true")
-    parse.add_argument("-g", "--gui", action="store_true")
-    parse.add_argument("-d", "--db", action="store", required=True)
     args = parse.parse_args()
 
     try:
-        handle = SqliteHandle(args.db)
-    except Exception as err:  # pylint: disable=broad-exception-caught
-        if args.traceback:
-            raise err
-        print(f"{err}")
-        sys.exit(1)
-
-    try:
-        all_sets = handle.get_all_sets()
-        if args.gui:
-            from language_practice.gui import GuiApplication  # pylint: disable=import-outside-toplevel
-            gui = GuiApplication(handle, all_sets, application_id="me.jbaublitz.LanguagePractice")
-            gui.run()
-        else:
-            from language_practice.terminal import TerminalApplication  # pylint: disable=import-outside-toplevel
-            tui = TerminalApplication(handle, all_sets)
-            tui.run()
+        gui = GuiApplication()
+        gui.run()
     except Exception as err:  # pylint: disable=broad-exception-caught
         if args.traceback:
             raise err
 
         print(f"{err}")
-        handle.close()
         sys.exit(1)
     except KeyboardInterrupt:
         print("Exiting...")
-        handle.close()
-    else:
-        handle.close()
 
 
 if __name__ == "__main__":
