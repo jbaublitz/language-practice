@@ -3,8 +3,8 @@ Terminal application interface.
 """
 
 import os
-from sqlite3 import IntegrityError
 import tomllib
+from sqlite3 import IntegrityError
 from uuid import uuid4
 
 from textual.app import App
@@ -20,13 +20,14 @@ from textual.widgets import (
     Button,
     Checkbox,
     DataTable,
+    Digits,
     DirectoryTree,
     Footer,
     Header,
     Label,
 )
 
-from language_practice.config import TomlConfig
+from language_practice.config import Entry, TomlConfig
 from language_practice.flashcard import Flashcard
 from language_practice.sqlite import SqliteHandle
 from language_practice.web import scrape
@@ -80,6 +81,7 @@ class TerminalApplication(App):
             Button("Import", id="import"),
             Button("Delete", id="delete"),
             Button("Select all", id="select_all"),
+            Button("Deselect all", id="deselect_all"),
             Button("Start", id="start"),
             Button("Exit", id="exit"),
             Container(),
@@ -134,15 +136,13 @@ class TerminalApplication(App):
                     set_id = self.handle.get_id_from_file_name(name)
                     if set_id is not None:
                         self.handle.delete_set(set_id)
-                    checkbox.parent.remove()
+                    if checkbox.parent is not None:
+                        checkbox.parent.remove()
 
     def on_exit_study(self):
         """
         On exit study button press.
         """
-        if self.flashcard is not None:
-            self.flashcard.save()
-        self.flashcard = None
         self.pop_screen()
 
     async def on_complete_import(self):
@@ -151,13 +151,25 @@ class TerminalApplication(App):
         """
         await self.pop_screen()
         toml = None
-        for import_file in self.imports:
+
+        imports = []
+        path = list(self.imports.keys())[0]
+        if os.path.isdir(path):
+            for d, _, files in os.walk(path):
+                imports = [os.path.join(d, file) for file in files]
+        else:
+            imports = list(self.imports)
+
+        for import_file in imports:
             try:
                 toml = TomlConfig(import_file)
             except tomllib.TOMLDecodeError as err:
                 self.push_screen(AlertWindow(f"{import_file}: {err}"))
                 continue
             except UnicodeDecodeError as err:
+                self.push_screen(AlertWindow(f"{import_file}: {err}"))
+                continue
+            except RuntimeError as err:
                 self.push_screen(AlertWindow(f"{import_file}: {err}"))
                 continue
 
@@ -187,6 +199,12 @@ class TerminalApplication(App):
                     )
                 )
 
+    async def on_cancel_import(self):
+        """
+        On complete import button press.
+        """
+        await self.pop_screen()
+
     #  pylint: disable=too-many-branches
     async def on_button_pressed(self, event: Button.Pressed):
         """
@@ -207,15 +225,45 @@ class TerminalApplication(App):
                 self.on_exit_study()
             elif button_id == "complete_import":
                 await self.on_complete_import()
+            elif button_id == "cancel_import":
+                await self.on_cancel_import()
             elif button_id == "select_all":
                 for checkbox in self.query(Checkbox):
                     checkbox.value = True
+            elif button_id == "deselect_all":
+                for checkbox in self.query(Checkbox):
+                    checkbox.value = False
 
     async def on_directory_tree_file_selected(self, event):
         """
         Handle directory tree selection in application.
         """
         table = self.query_one("#selected")
+        path = event.path
+        realpath = os.path.realpath(path)
+
+        if len(self.imports) == 1 and os.path.isdir(list(self.imports.keys())[0]):
+            for uuid in self.imports.values():
+                table.remove_row(uuid)
+            self.imports.clear()
+
+        if realpath in self.imports:
+            this_uuid = self.imports.pop(realpath)
+            table.remove_row(this_uuid)
+        else:
+            this_uuid = str(uuid4())
+            self.imports[realpath] = this_uuid
+            table.add_row(realpath, key=this_uuid)
+
+    async def on_directory_tree_directory_selected(self, event):
+        """
+        Handle directory tree selection in application.
+        """
+        table = self.query_one("#selected")
+        for uuid in self.imports.values():
+            table.remove_row(uuid)
+        self.imports.clear()
+
         path = event.path
         realpath = os.path.realpath(path)
         if realpath in self.imports:
@@ -233,7 +281,7 @@ class ImportPopup(ModalScreen):
     """
 
     def compose(self):
-        table = DataTable(id="selected")
+        table: DataTable = DataTable(id="selected")
         table.add_columns("Files")
         yield Vertical(
             HorizontalScroll(
@@ -243,6 +291,7 @@ class ImportPopup(ModalScreen):
             Horizontal(
                 Container(),
                 Button("Complete import", id="complete_import"),
+                Button("Cancel", id="cancel_import"),
                 Container(),
                 classes="bottom-buttons-one",
             ),
@@ -257,8 +306,8 @@ class StudyScreen(ModalScreen):
     def __init__(self, flashcard, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.flashcard = flashcard
-        self.peek = None
-        self.is_review = None
+        self.peek: Entry | None = None
+        self.is_review = True
 
     def compose(self):
         (self.peek, self.is_review) = self.flashcard.current()
@@ -270,6 +319,7 @@ class StudyScreen(ModalScreen):
                 definition = r"\[" + f"{part_of_speech}] {definition}"
             if aspect is not None:
                 definition = r"\[" + f"{aspect}] {definition}"
+            yield Digits(f"{self.flashcard.flashcards_left()} left", id="remaining")
             yield Horizontal(
                 Container(),
                 Label(definition, id="display"),
@@ -302,24 +352,31 @@ class StudyScreen(ModalScreen):
             yield Label("Nothing to study")
             yield Button("Exit", id="exit_study")
 
-    def initial_display(self):
+    async def initial_display(self):
         """
         Initial display for a flashcard.
         """
-        part_of_speech = self.peek.get_part_of_speech()
-        aspect = self.peek.get_aspect()
-        definition = self.peek.get_definition()
-        if part_of_speech is not None:
-            definition = r"\[" + f"{part_of_speech}] {definition}"
-        if aspect is not None:
-            definition = r"\[" + f"{aspect}] {definition}"
-        self.mount(Label(definition, id="display"), before="#post_display")
+        if self.peek is not None:
+            part_of_speech = self.peek.get_part_of_speech()
+            aspect = self.peek.get_aspect()
+            definition = self.peek.get_definition()
+
+            if part_of_speech is not None:
+                definition = r"\[" + f"{part_of_speech}] {definition}"
+            if aspect is not None:
+                definition = r"\[" + f"{aspect}] {definition}"
+            self.mount(Label(definition, id="display"), before="#post_display")
+        else:
+            await self.at_end()
 
     def next(self):
         """
         Select next flashcard.
         """
         self.flashcard.post_grade()
+        remaining = self.query_one("#remaining")
+        if remaining is not None:
+            remaining.update(f"{self.flashcard.flashcards_left()} left")
         (self.peek, self.is_review) = self.flashcard.current()
 
     async def at_end(self):
@@ -343,10 +400,7 @@ class StudyScreen(ModalScreen):
             self.peek.get_repetition().grade(grade)
         self.next()
         await self.query_one("#display").remove()
-        if self.peek is None:
-            await self.at_end()
-        else:
-            self.initial_display()
+        await self.initial_display()
 
     async def on_word(self):
         """
@@ -378,7 +432,7 @@ class StudyScreen(ModalScreen):
         await self.query_one("#display").remove()
         tables = []
         for chart in self.peek.get_charts():
-            table = DataTable(show_header=False)
+            table: DataTable = DataTable(show_header=False)
             max_cols = max(map(len, chart))
             cols = [chr(i + 97) for i in range(0, max_cols)]
             table.add_columns(*cols)
@@ -397,7 +451,7 @@ class StudyScreen(ModalScreen):
         """
         if event.button.id == "definition":
             await self.query_one("#display").remove()
-            self.initial_display()
+            await self.initial_display()
         elif event.button.id == "word":
             await self.on_word()
         elif event.button.id == "usage":

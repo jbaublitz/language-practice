@@ -6,17 +6,22 @@ Graphical user interface.
 #  pylint: disable=too-few-public-methods
 
 import asyncio
-from sqlite3 import IntegrityError
 import tomllib
+from sqlite3 import IntegrityError
 from typing import Self
 
 import gi  # type: ignore
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk, Gio  # type: ignore  # pylint: disable=wrong-import-order
-from language_practice.flashcard import Flashcard  # type: ignore
+from gi.repository import (  # type: ignore  # pylint: disable=wrong-import-order
+    Adw,
+    Gio,
+    Gtk,
+)
+
 from language_practice.config import TomlConfig
+from language_practice.flashcard import Flashcard  # type: ignore
 from language_practice.sqlite import SqliteHandle
 from language_practice.web import scrape
 
@@ -41,7 +46,52 @@ class GuiApplication(Adw.Application):
         """
         self.win = MainWindow(self.handle, self.flashcard_sets, application=app)
         self.win.set_title("Language Practice")
-        self.win.set_default_size(700, 700)
+
+        css = Gtk.CssProvider.new()
+        css.load_from_string(
+            """
+            grid {
+                margin-top: 15px;
+                margin-bottom: 15px;
+                margin-left: 15px;
+                margin-right: 15px;
+            }
+
+            button {
+                margin-bottom: 15px;
+                margin-left: 7px;
+                margin-right: 7px;
+            }
+
+            label {
+                font-size: 20px;
+            }
+
+            label.word {
+                font-size: 40px;
+                margin-top: 15px;
+                margin-bottom: 45px;
+                margin-left: 15px;
+                margin-right: 15px;
+            }
+
+            label.counter {
+                font-size: 30px;
+                margin-top: 15px;
+                margin-bottom: 15px;
+                margin-left: 15px;
+                margin-right: 15px;
+            }
+
+        """
+        )
+
+        Gtk.StyleContext.add_provider_for_display(
+            Gtk.Widget.get_display(self.win),
+            css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+
         self.win.present()
 
 
@@ -63,11 +113,12 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.flashcard_set_grid = FlashcardSetGrid()
         for flashcard_set in flashcard_sets:
-            self.flashcard_set_grid.add_row(
-                Gtk.CheckButton(), Gtk.Label.new(flashcard_set)
-            )
-        scrollable = Gtk.ScrolledWindow()
-        scrollable.set_size_request(700, 600)
+            label = Gtk.Label(halign=Gtk.Align.START)
+            label.set_text(flashcard_set)
+            self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
+        scrollable = Gtk.ScrolledWindow(
+            propagate_natural_height=True, propagate_natural_width=True
+        )
         scrollable.set_child(self.flashcard_set_grid)
 
         button_hbox = Gtk.Box(spacing=6)
@@ -80,6 +131,9 @@ class MainWindow(Gtk.ApplicationWindow):
         select_all_button = Gtk.Button(label="Select all")
         select_all_button.connect("clicked", self.flashcard_set_grid.select_all)
         button_hbox.append(select_all_button)
+        deselect_all_button = Gtk.Button(label="Deselect all")
+        deselect_all_button.connect("clicked", self.flashcard_set_grid.deselect_all)
+        button_hbox.append(deselect_all_button)
         start_button = Gtk.Button(label="Start")
         start_button.connect("clicked", self.handle_start)
         button_hbox.append(start_button)
@@ -131,6 +185,12 @@ class MainWindow(Gtk.ApplicationWindow):
                 dialog.set_modal(True)
                 dialog.choose()
                 continue
+            except RuntimeError as err:
+                dialog = Gtk.AlertDialog()
+                dialog.set_message(f"{current_import}: {err}")
+                dialog.set_modal(True)
+                dialog.choose()
+                continue
 
             try:
                 new = self.handle.import_set(
@@ -149,10 +209,9 @@ class MainWindow(Gtk.ApplicationWindow):
                 continue
 
             if new:
-                self.flashcard_set_grid.add_row(
-                    Gtk.CheckButton(),
-                    Gtk.Label.new(current_import),
-                )
+                label = Gtk.Label(halign=Gtk.Align.START)
+                label.set_text(current_import)
+                self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
         self.imports = []
 
     #  pylint: disable=unused-argument
@@ -171,17 +230,7 @@ class MainWindow(Gtk.ApplicationWindow):
         if config is not None:
             self.flashcard = Flashcard(self.handle, config.get_words())
             win = StudyWindow(self.flashcard)
-            win.connect("destroy", self.handle_study_exit)
-            win.set_default_size(700, 300)
             win.present()
-
-    def handle_study_exit(self):
-        """
-        Handle exit of study window.
-        """
-        if self.flashcard is not None:
-            self.flashcard.save()
-        self.flashcard = None
 
 
 class FlashcardSetGrid(Gtk.Grid):
@@ -192,7 +241,8 @@ class FlashcardSetGrid(Gtk.Grid):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.set_column_spacing(10)
+        self.set_column_spacing(15)
+        self.set_row_spacing(15)
         self.num_rows = 0
 
     def add_row(self, checkbox: Gtk.CheckButton, label: Gtk.Label):
@@ -217,6 +267,14 @@ class FlashcardSetGrid(Gtk.Grid):
         """
         for row in range(self.num_rows):
             self.get_child_at(0, row).set_active(True)
+
+    #  pylint: disable=unused-argument
+    def deselect_all(self, button: Gtk.Button):
+        """
+        Mark all checkboxes as selected.
+        """
+        for row in range(self.num_rows):
+            self.get_child_at(0, row).set_active(False)
 
     #  pylint: disable=unused-argument
     def get_selected(self) -> list[tuple[str, int]]:
@@ -246,17 +304,26 @@ class StudyWindow(Gtk.ApplicationWindow):
             button_hbox_1 = self.grade_button_box()
             button_hbox_2 = self.navigation_button_box()
 
-            self.display_box = Gtk.ScrolledWindow()
-            self.display_box.set_halign(Gtk.Align.CENTER)
-            self.display_box.set_size_request(700, 200)
+            self.display_box = Gtk.ScrolledWindow(
+                propagate_natural_height=True, propagate_natural_width=True
+            )
             self.initial_display()
 
             vbox = Gtk.Box(spacing=6, orientation=Gtk.Orientation.VERTICAL)
+            self.counter_label = Gtk.Label(halign=Gtk.Align.START)
+            self.counter_label.set_text(f"{self.flashcard.flashcards_left()} left")
+            self.counter_label.set_css_classes(["counter"])
+            vbox.append(self.counter_label)
             vbox.append(self.display_box)
             vbox.append(button_hbox_1)
             vbox.append(button_hbox_2)
 
             self.set_child(vbox)
+        else:
+            label = Gtk.Label()
+            label.set_text("Nothing to study")
+            label.set_css_classes("word")
+            self.set_child(label)
 
     def grade_button_box(self) -> Gtk.Box:
         """
@@ -311,6 +378,7 @@ class StudyWindow(Gtk.ApplicationWindow):
         Select next flashcard.
         """
         self.flashcard.post_grade()
+        self.counter_label.set_text(f"{self.flashcard.flashcards_left()} left")
         (self.peek, self.is_review) = self.flashcard.current()
 
     def grade(self, grade: int):
@@ -332,26 +400,44 @@ class StudyWindow(Gtk.ApplicationWindow):
         if self.peek is not None:
             part_of_speech = self.peek.get_part_of_speech()
             aspect = self.peek.get_aspect()
-            definition = Gtk.Label.new(self.peek.get_definition())
+            definition = Gtk.Label()
+            definition.set_text(self.peek.get_definition())
+            definition.set_css_classes(["word"])
             box = Gtk.Box(spacing=10)
             box.prepend(definition)
             if part_of_speech is not None:
-                box.prepend(Gtk.Label.new(part_of_speech))
+                part_of_speech_label = Gtk.Label()
+                part_of_speech_label.set_text(part_of_speech)
+                part_of_speech_label.set_css_classes(["word"])
+                box.prepend(part_of_speech_label)
             if aspect is not None:
-                box.prepend(Gtk.Label.new(aspect))
+                aspect_label = Gtk.Label()
+                aspect_label.set_text(aspect)
+                aspect_label.set_css_classes(["word"])
+                box.prepend(aspect_label)
             self.display_box.set_child(box)
+        else:
+            all_done = Gtk.Label()
+            all_done.set_text("All done!")
+            all_done.set_css_classes(["word"])
+            self.set_child(all_done)
 
     def on_flashcard_back(self):
         """
         Handle flashcard back button press.
         """
         if self.peek is not None:
-            word = Gtk.Label.new(self.peek.get_word())
+            word = Gtk.Label()
+            word.set_text(self.peek.get_word())
+            word.set_css_classes(["word"])
             gender = self.peek.get_gender()
             box = Gtk.Box(spacing=10)
             box.prepend(word)
-            if gender is None:
-                box.prepend(Gtk.Label.new(gender))
+            if gender is not None:
+                gender_label = Gtk.Label()
+                gender_label.set_text(gender)
+                gender_label.set_css_classes(["word"])
+                box.prepend(gender_label)
             self.display_box.set_child(box)
 
     def on_usage(self):
