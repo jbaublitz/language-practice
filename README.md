@@ -57,4 +57,4 @@ This app uses SuperMemo 2 for spaced repetition.
 # Contributing
 
 Please open bugs and request features on Github! I would love to make this more useful
-to others.
+to others. Usability issues are always appreciated.
