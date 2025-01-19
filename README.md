@@ -48,6 +48,7 @@ perfective and imperfective verbs if the language you know does not have them
 similar cases where the part of speech is not clear in your language from the word
 itself
 * `charts`: add custom inflection chart where not available on Wiktionary
+* `gender`: gender of the word, displayed with the word to be studied
 
 ## Spaced repetition
 
