@@ -101,15 +101,16 @@ class MainWindow(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.set_default_size(-1, 600)
+
         self.handle = None
         self.flashcard: Flashcard | None = None
 
         vbox = Gtk.Box(spacing=6, orientation=Gtk.Orientation.VERTICAL)
 
         self.flashcard_set_grid = FlashcardSetGrid()
-        scrollable = Gtk.ScrolledWindow(
-            propagate_natural_height=True, propagate_natural_width=True
-        )
+        scrollable = Gtk.ScrolledWindow()
+        scrollable.set_vexpand(True)
         scrollable.set_child(self.flashcard_set_grid)
 
         button_hbox = Gtk.Box(spacing=6)
@@ -377,6 +378,9 @@ class StudyWindow(Gtk.ApplicationWindow):
 
     def __init__(self, flashcard: Flashcard, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.set_default_size(-1, 600)
+
         self.set_title("Language Practice")
         self.flashcard = flashcard
 
@@ -385,9 +389,8 @@ class StudyWindow(Gtk.ApplicationWindow):
             button_hbox_1 = self.grade_button_box()
             button_hbox_2 = self.navigation_button_box()
 
-            self.display_box = Gtk.ScrolledWindow(
-                propagate_natural_height=True, propagate_natural_width=True
-            )
+            self.display_box = Gtk.ScrolledWindow()
+            self.display_box.set_vexpand(True)
             self.initial_display()
 
             vbox = Gtk.Box(spacing=6, orientation=Gtk.Orientation.VERTICAL)
