@@ -146,8 +146,12 @@ class SqliteHandle:
                 table_uuid = str(uuid.uuid4())
                 table_uuids.append(table_uuid)
                 max_len = max(map(len, chart))
+                if max_len > 26:
+                    raise RuntimeError(
+                        "Inflection tables are only only supported up to a column size of 26"
+                    )
                 schema = ", ".join([f"{chr(i + 97)} TEXT" for i in range(0, max_len)])
-                self.__recreate_table(f"{table_uuid}", schema)
+                self.__recreate_table(table_uuid, schema)
                 for row in chart:
                     columns = []
                     values = []
@@ -245,8 +249,12 @@ class SqliteHandle:
                 table_uuid = str(uuid.uuid4())
                 table_uuids.append(table_uuid)
                 max_len = max(map(len, chart))
+                if max_len > 26:
+                    raise RuntimeError(
+                        "Inflection tables are only only supported up to a column size of 26"
+                    )
                 schema = ", ".join([f"{chr(i + 97)} TEXT" for i in range(0, max_len)])
-                self.__recreate_table(f"{table_uuid}", schema)
+                self.__recreate_table(table_uuid, schema)
                 for row in chart:
                     columns = []
                     values = []
@@ -337,6 +345,7 @@ class SqliteHandle:
         set_id = self.get_id_from_file_name(file_name)
         if set_id is None:
             self.__create_new_set(file_name, config, scraped)
+            self.conn.commit()
             return True
 
         self.__update_set(set_id, config, scraped)

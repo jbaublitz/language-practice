@@ -274,6 +274,15 @@ class MainWindow(Gtk.ApplicationWindow):
                 if set_id is not None:
                     self.handle.delete_set(set_id)
                 continue
+            except RuntimeError as err:
+                dialog = Gtk.AlertDialog()
+                dialog.set_message(f"{current_import}: {err}")
+                dialog.set_modal(True)
+                dialog.choose()
+                set_id = self.handle.get_id_from_file_name(current_import)
+                if set_id is not None:
+                    self.handle.delete_set(set_id)
+                continue
 
             if new:
                 label = Gtk.Label(halign=Gtk.Align.START)
