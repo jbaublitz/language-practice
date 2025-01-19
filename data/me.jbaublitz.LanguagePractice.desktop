@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Language Practice
+GenericName=Language Practice
+Comment=Flashcard application
+Icon=airplane-mode-symbolic
+Exec=language-practice
+Actions=
+Categories=X-GNOME-Other;
