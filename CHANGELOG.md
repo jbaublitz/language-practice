@@ -1,3 +1,7 @@
+# 0.3.0
+* Migration to sqlite3 database backing SuperMemo2 algorithm
+* GTK frontend
+
 # 0.2.1
 
 ## Bug fixes
