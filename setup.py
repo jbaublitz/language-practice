@@ -1,3 +1,5 @@
 from setuptools import setup
 
-setup()
+setup(
+    data_files=[("share/applications", ["data/me.jbaublitz.LanguagePractice.desktop"])]
+)

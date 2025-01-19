@@ -39,7 +39,7 @@ def main():
     args = parse.parse_args()
 
     try:
-        gui = GuiApplication()
+        gui = GuiApplication(application_id="me.jbaublitz.LanguagePractice")
         gui.run()
     except Exception as err:  # pylint: disable=broad-exception-caught
         if args.traceback:
