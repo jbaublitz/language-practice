@@ -21,21 +21,7 @@ Download the repo and run `pip install --user .` in the top level of the repo.
 
 # Running the program
 
-Run `language-practice path/to/toml/file.toml` to start the program. This may take
-some time if you are using conjugation or declension charts as it will pull them in
-parallel from the internet. An internet connection is only required for this part
-of the execution.
-
-Command line options:
-* `-t`/`--traceback`: useful for bug reporting, bubbles the Python exception up to the
-terminal
-* `-r`/`--reset`: Redownload the entire cache and current information about what words you
-have guessed correctly/incorrectly
-* `-f`/`--file`: Path to the file containing the flashcard information
-* `-d`/`--dir`: File is a directory and all TOML files in the given directory should be loaded
-by the application
-
-Run ctrl-C to exit the program and save your progress
+Run `language-practice` to start the program.
 
 ## File format
 
@@ -63,40 +49,9 @@ similar cases where the part of speech is not clear in your language from the wo
 itself
 * `charts`: add custom inflection chart where not available on Wiktionary
 
-## Commands
-
-Type:
-
-* e to show the initial side of the flashcard you first saw with the word in your
-language
-* d to show the the word in the language you are studying
-* y to mark a word as correctly recalled
-* n to mark a word as incorrectly recalled
-* c to see the declension or conjugation chart 
-* u to see usage information
-* r to refresh the downloaded cache for the current entry
-
 ## Spaced repetition
 
-This app will show you words you get right less and less frequently and words you get
-wrong more and more frequently until you get them right.
-
-The exact algorithm is rather simple and could potentially be improved.
-
-`num_right` is number of times guessed correctly.
-
-`num_wrong` is number of times guessed incorrectly.
-
-`num_wrong_since` is the number of times you have gotten it wrong since 10 correct
-answers. This is used to balance out words that you sometimes get correct and sometimes
-get incorrect to keep it in less frequent but current rotation until you consistently
-guess it right.
-
-`num_right` and `num_wrong` are mutally exclusive. If one is non-zero, the other will
-be set to zero.
-
-The card will be repeated `n` cards later where `n` is
-`num_right * max(15 - num_wrong_since, 1)` or `max(15 - num_wrong, 1)`.
+This app uses SuperMemo 2 for spaced repetition.
 
 # Contributing
 
