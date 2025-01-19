@@ -33,6 +33,12 @@ class Flashcard:
         self.review = deque(review)
         self.complete: list[Entry] = []
 
+    def flashcards_left(self) -> int:
+        """
+        Get number of flashcards left.
+        """
+        return len(self.scheduled) + len(self.review)
+
     def current(self) -> tuple[Entry | None, bool | None]:
         """
         Get current flashcard.
@@ -58,6 +64,8 @@ class Flashcard:
         else:
             next_entry = self.review.popleft()
 
+        self.handle.update_config(next_entry.get_word(), next_entry.get_repetition())
+
         if next_entry.get_repetition().get_review():
             self.review.append(next_entry)
         else:
@@ -68,11 +76,3 @@ class Flashcard:
         Get all flashcard entries.
         """
         return list(self.review) + list(self.scheduled) + self.complete
-
-    def save(self):
-        """
-        Save updates to the flashcards.
-        """
-        all_entries = self.get_all_entries()
-        for entry in all_entries:
-            self.handle.update_config(entry.get_word(), entry.get_repetition())

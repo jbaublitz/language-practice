@@ -2,9 +2,10 @@
 Database code
 """
 
-import uuid
 import sqlite3
+import uuid
 from datetime import date
+from typing import Any
 
 from language_practice.config import Config, Entry, WordRepetition
 
@@ -30,30 +31,24 @@ class SqliteHandle:
         self.conn = sqlite3.connect(db)
         self.cursor = self.conn.cursor()
 
-        self.create_table_idempotent(
+        self.__create_table(
             SqliteHandle.FLASHCARDS_TABLE_NAME, SqliteHandle.FLASHCARDS_SCHEMA
         )
 
-    def create_table_idempotent(self, name: str, schema: str):
+    def __create_table(self, name: str, schema: str):
         """
         Create a table only if it doesn't exist
         """
         self.cursor.execute(f"CREATE TABLE IF NOT EXISTS '{name}' ({schema});")
 
-    def recreate_table(self, name: str, schema: str):
+    def __recreate_table(self, name: str, schema: str):
         """
         Recreate a table even if it exists
         """
-        self.drop_table(name)
+        self.__drop_table(name)
         self.cursor.execute(f"CREATE TABLE '{name}' ({schema});")
 
-    def delete(self, name: str, search: str):
-        """
-        Delete entry.
-        """
-        self.cursor.execute(f"DELETE FROM '{name}' WHERE {search};")
-
-    def drop_table(self, name: str):
+    def __drop_table(self, name: str):
         """
         Drop table.
         """
@@ -61,27 +56,13 @@ class SqliteHandle:
         if (name,) in res.fetchall():
             self.cursor.execute(f"DROP TABLE '{name}';")
 
-    def insert_into(self, name: str, columns: str, values: str):
-        """
-        Insert into table.
-        """
-        self.cursor.execute(
-            f"INSERT OR IGNORE INTO '{name}' ({columns}) VALUES({values});"
-        )
-
-    def update(self, name: str, set_statements: str, condition: str):
-        """
-        Insert into table.
-        """
-        self.cursor.execute(f"UPDATE '{name}' SET {set_statements} WHERE {condition};")
-
     def get_id_from_file_name(self, file_name: str) -> int | None:
         """
         Checks whether the flashcard set already exists.
         """
         table_name = SqliteHandle.FLASHCARDS_TABLE_NAME
         res = self.cursor.execute(
-            f"SELECT id FROM {table_name} WHERE file_name = '{file_name}';"
+            f"SELECT id FROM {table_name} WHERE file_name = ?", (file_name,)
         )
         set_id = res.fetchone()
         if set_id is not None:
@@ -89,20 +70,21 @@ class SqliteHandle:
         return set_id
 
     #  pylint: disable=too-many-locals
-    def update_set(
+    def __update_set(
         self, set_id: int, config: Config, scraped: dict[str, list[list[list[str]]]]
     ):
         """
         Update an existing flashcard set.
         """
         lang = config.get_lang()
-        self.update(
-            SqliteHandle.FLASHCARDS_TABLE_NAME, f"lang = '{lang}'", f"id = {set_id}"
+        self.cursor.execute(
+            f"UPDATE {SqliteHandle.FLASHCARDS_TABLE_NAME} SET lang = ? WHERE id = ?",
+            (lang, set_id),
         )
 
         table_name = SqliteHandle.WORD_TABLE_NAME
         res = self.cursor.execute(
-            f"SELECT word FROM {table_name} WHERE flashcard_set_id = {set_id}"
+            f"SELECT word FROM {table_name} WHERE flashcard_set_id = ?", (set_id,)
         )
         current_words = set(map(lambda word: word[0], res.fetchall()))
         config_word_dct = {entry.get_word(): entry for entry in config}
@@ -110,26 +92,31 @@ class SqliteHandle:
 
         words_to_add = config_words - current_words
         for word in words_to_add:
-            self.insert_word(set_id, config_word_dct[word], scraped.get(word, None))
+            self.__insert_word(set_id, config_word_dct[word], scraped.get(word, None))
 
         words_to_update = current_words & config_words
         for word in words_to_update:
-            self.update_word(config_word_dct[word], scraped.get(word, None))
+            self.__update_word(config_word_dct[word], scraped.get(word, None))
 
         words_to_delete = current_words - config_words
         for word in words_to_delete:
-            self.delete(SqliteHandle.WORD_TABLE_NAME, f"word = '{word}'")
+            self.cursor.execute(
+                "DELETE FROM {SqliteHandle.WORD_TABLE_NAME} WHERE word = ?", (word,)
+            )
             res = self.cursor.execute(
-                f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' WHERE word='{word}';"
+                f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' WHERE word = ?;",
+                (word,),
             )
             table_uuids = res.fetchone()
             if table_uuids is not None:
-                for table_uuid in table_uuids[0].split(","):
-                    self.drop_table(table_uuid)
+                table_uuids_one = table_uuids[0]
+                if table_uuids_one is not None:
+                    for table_uuid in table_uuids_one.split(","):
+                        self.__drop_table(table_uuid)
 
     #  pylint: disable=too-many-branches
     #  pylint: disable=too-many-statements
-    def insert_word(
+    def __insert_word(
         self, set_id: int, entry: Entry, scraped: list[list[list[str]]] | None
     ):
         """
@@ -160,22 +147,25 @@ class SqliteHandle:
                 table_uuids.append(table_uuid)
                 max_len = max(map(len, chart))
                 schema = ", ".join([f"{chr(i + 97)} TEXT" for i in range(0, max_len)])
-                self.recreate_table(f"{table_uuid}", schema)
+                self.__recreate_table(f"{table_uuid}", schema)
                 for row in chart:
                     columns = []
                     values = []
                     for j in range(0, max_len):
                         try:
                             val = row[j]
-                            val = val.replace("'", "''")
                         except IndexError:
                             pass
                         else:
                             columns.append(chr(j + 97))
-                            values.append(f"'{val}'")
-                    self.insert_into(table_uuid, ", ".join(columns), ", ".join(values))
-
-        word = word.replace("'", "''")
+                            values.append(val)
+                    column_names = ", ".join(columns)
+                    value_places = ", ".join(["?" for _ in range(len(values))])
+                    self.cursor.execute(
+                        f"INSERT OR IGNORE INTO '{table_uuid}' ({column_names}) "
+                        f"VALUES({value_places})",
+                        values,
+                    )
 
         columns = [
             "word",
@@ -187,36 +177,41 @@ class SqliteHandle:
             "review",
             "flashcard_set_id",
         ]
-        values = [
-            f"'{word}'",
-            f"'{definition}'",
-            f"{easiness_factor}",
-            f"{num_correct}",
-            f"{in_n_days}",
-            f"'{date_of_next}'",
-            f"{review}",
-            f"'{set_id}'",
+        insert_values: list[Any] = [
+            word,
+            definition,
+            easiness_factor,
+            num_correct,
+            in_n_days,
+            date_of_next,
+            review,
+            set_id,
         ]
         if gender is not None:
             columns.append("gender")
-            values.append(f"'{gender}'")
+            insert_values.append(gender)
         if aspect is not None:
             columns.append("aspect")
-            values.append(f"'{aspect}'")
+            insert_values.append(aspect)
         if usage is not None:
             columns.append("usage")
-            values.append(f"'{usage}'")
+            insert_values.append(usage)
         if part_of_speech is not None:
             columns.append("part_of_speech")
-            values.append(f"'{part_of_speech}'")
+            insert_values.append(part_of_speech)
         if len(table_uuids) > 0:
             columns.append("table_uuids")
             table_uuid_str = ",".join(table_uuids)
-            values.append(f"'{table_uuid_str}'")
-        self.insert_into("words", ", ".join(columns), ", ".join(values))
+            insert_values.append(table_uuid_str)
+        column_names = ", ".join(columns)
+        value_places = ", ".join(["?" for _ in range(len(insert_values))])
+        self.cursor.execute(
+            f"INSERT OR IGNORE INTO words ({column_names}) VALUES({value_places})",
+            insert_values,
+        )
 
     #  pylint: disable=too-many-branches
-    def update_word(self, entry: Entry, scraped: list[list[list[str]]] | None):
+    def __update_word(self, entry: Entry, scraped: list[list[list[str]]] | None):
         """
         Update existing word in the table.
         """
@@ -233,12 +228,15 @@ class SqliteHandle:
             final_charts = [charts]
 
         res = self.cursor.execute(
-            f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' where word = '{word}';"
+            f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' where word = ?",
+            (word,),
         )
         table_uuids = res.fetchone()
         if table_uuids is not None:
-            for table_uuid in table_uuids[0].split(","):
-                self.drop_table(table_uuid)
+            table_uuids_one = table_uuids[0]
+            if table_uuids_one is not None:
+                for table_uuid in table_uuids_one.split(","):
+                    self.__drop_table(table_uuid)
 
         table_uuids = []
         if final_charts is not None:
@@ -248,44 +246,58 @@ class SqliteHandle:
                 table_uuids.append(table_uuid)
                 max_len = max(map(len, chart))
                 schema = ", ".join([f"{chr(i + 97)} TEXT" for i in range(0, max_len)])
-                self.recreate_table(f"{table_uuid}", schema)
+                self.__recreate_table(f"{table_uuid}", schema)
                 for row in chart:
                     columns = []
                     values = []
                     for j in range(0, max_len):
                         try:
                             val = row[j]
-                            val = val.replace("'", "''")
                         except IndexError:
                             pass
                         else:
                             columns.append(chr(j + 97))
-                            values.append(f"'{val}'")
-                    self.insert_into(table_uuid, ", ".join(columns), ", ".join(values))
-
-        word = word.replace("'", "''")
+                            values.append(val)
+                    column_names = ", ".join(columns)
+                    value_places = ", ".join(["?" for _ in range(len(values))])
+                    self.cursor.execute(
+                        f"INSERT OR IGNORE INTO '{table_uuid}' ({column_names}) "
+                        f"VALUES({value_places})",
+                        values,
+                    )
 
         set_statements = [
-            f"word = '{word}'",
-            f"definition = '{definition}'",
+            "word = ?",
+            "definition = ?",
+        ]
+        args = [
+            word,
+            definition,
         ]
         if gender is not None:
-            set_statements.append(f"gender = '{gender}'")
+            set_statements.append("gender = ?")
+            args.append(gender)
         if aspect is not None:
-            set_statements.append(f"aspect = '{aspect}'")
+            set_statements.append("aspect = ?")
+            args.append(aspect)
         if usage is not None:
-            set_statements.append(f"usage = '{usage}'")
+            set_statements.append("usage = ?")
+            args.append(usage)
         if part_of_speech is not None:
-            set_statements.append(f"part_of_speech = '{part_of_speech}'")
+            set_statements.append("part_of_speech = ?")
+            args.append(part_of_speech)
         if len(table_uuids) > 0:
             table_uuid_str = ",".join(table_uuids)
-            set_statements.append(f"table_uuids = '{table_uuid_str}'")
+            set_statements.append("table_uuids = ?")
+            args.append(table_uuid_str)
 
-        self.update(
-            SqliteHandle.WORD_TABLE_NAME, ", ".join(set_statements), f"word = '{word}'"
+        all_set_statements = ", ".join(set_statements)
+        self.cursor.execute(
+            f"UPDATE {SqliteHandle.WORD_TABLE_NAME} SET {all_set_statements} WHERE word = ?",
+            args + [word],
         )
 
-    def create_new_set(
+    def __create_new_set(
         self, file_name: str, config: Config, scraped: dict[str, list[list[list[str]]]]
     ):
         """
@@ -293,19 +305,24 @@ class SqliteHandle:
         """
         lang = config.get_lang()
         columns = ["file_name"]
-        values = [f"'{file_name}'"]
+        values = [file_name]
         if lang is not None:
             columns.append("lang")
-            values.append(f"'{lang}'")
-        self.insert_into("flashcard_sets", ", ".join(columns), ", ".join(values))
+            values.append(lang)
+        column_names = ", ".join(columns)
+        value_places = ", ".join(["?" for _ in range(len(values))])
+        self.cursor.execute(
+            f"INSERT INTO flashcard_sets ({column_names}) VALUES({value_places})",
+            values,
+        )
         set_id = self.cursor.lastrowid
-        self.create_table_idempotent(
+        self.__create_table(
             SqliteHandle.WORD_TABLE_NAME,
             SqliteHandle.WORD_SCHEMA,
         )
         if set_id is not None:
             for entry in iter(config):
-                self.insert_word(set_id, entry, scraped.get(entry.get_word(), None))
+                self.__insert_word(set_id, entry, scraped.get(entry.get_word(), None))
 
     #  pylint: disable=too-many-nested-blocks
     #  pylint: disable=too-many-statements
@@ -319,10 +336,11 @@ class SqliteHandle:
         """
         set_id = self.get_id_from_file_name(file_name)
         if set_id is None:
-            self.create_new_set(file_name, config, scraped)
+            self.__create_new_set(file_name, config, scraped)
             return True
 
-        self.update_set(set_id, config, scraped)
+        self.__update_set(set_id, config, scraped)
+        self.conn.commit()
         return False
 
     def delete_set(self, set_id: int):
@@ -331,14 +349,21 @@ class SqliteHandle:
         """
         res = self.cursor.execute(
             f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' WHERE "
-            f"flashcard_set_id = {set_id};"
+            "flashcard_set_id = ?",
+            (set_id,),
         )
         for uuids in res:
             if uuids[0] is not None:
                 for table_uuid in uuids[0].split(","):
-                    self.drop_table(table_uuid)
-        self.delete("words", f"flashcard_set_id = {set_id}")
-        self.delete("flashcard_sets", f"id = {set_id}")
+                    self.__drop_table(table_uuid)
+        self.cursor.execute(
+            f"DELETE FROM {SqliteHandle.WORD_TABLE_NAME} WHERE flashcard_set_id = ?",
+            (set_id,),
+        )
+        self.cursor.execute(
+            f"DELETE FROM {SqliteHandle.FLASHCARDS_TABLE_NAME} WHERE id = ?", (set_id,)
+        )
+        self.conn.commit()
 
     def load_config(self, file_name: str) -> Config:
         """
@@ -346,14 +371,15 @@ class SqliteHandle:
         """
         set_id = self.get_id_from_file_name(file_name)
         res = self.cursor.execute(
-            f"SELECT lang FROM flashcard_sets WHERE file_name = '{file_name}';"
+            "SELECT lang FROM flashcard_sets WHERE file_name = ?", (file_name,)
         )
         lang = res.fetchall()[0]
 
         res = self.cursor.execute(
-            f"SELECT word, definition, gender, aspect, usage, part_of_speech, "
-            f"easiness_factor, num_correct, in_n_days, date_of_next, review, "
-            f"table_uuids FROM 'words' WHERE flashcard_set_id = '{set_id}';"
+            "SELECT word, definition, gender, aspect, usage, part_of_speech, "
+            "easiness_factor, num_correct, in_n_days, date_of_next, review, "
+            "table_uuids FROM 'words' WHERE flashcard_set_id = ?",
+            (set_id,),
         )
         entries = res.fetchall()
 
@@ -414,14 +440,13 @@ class SqliteHandle:
         in_n_days = repetition.get_in_n_days()
         date_of_next = str(repetition.get_date_of_next())
         review = 1 if repetition.get_review() else 0
-        word = word.replace("'", "''")
-        self.update(
-            SqliteHandle.WORD_TABLE_NAME,
-            f"easiness_factor = {easiness_factor}, num_correct = {num_correct}, "
-            f"in_n_days = {in_n_days}, date_of_next = '{date_of_next}', "
-            f"review = {review}",
-            f"word = '{word}'",
+        self.cursor.execute(
+            f"UPDATE {SqliteHandle.WORD_TABLE_NAME} SET easiness_factor = ?, "
+            "num_correct = ?, in_n_days = ?, date_of_next = ?, review = ? "
+            "WHERE word = ?",
+            (easiness_factor, num_correct, in_n_days, date_of_next, review, word),
         )
+        self.conn.commit()
 
     def get_all_sets(self) -> list[str]:
         """
