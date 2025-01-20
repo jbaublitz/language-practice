@@ -1,3 +1,6 @@
+# 0.3.1
+* Addition of .desktop file for use with GNOME
+
 # 0.3.0
 * Migration to sqlite3 database backing SuperMemo2 algorithm
 * GTK frontend
