@@ -24,7 +24,7 @@ class Flashcard:
             repetition = entry.get_repetition()
             if repetition.get_review():
                 review.append(entry)
-            if repetition.get_date_of_next() <= date.today():
+            elif repetition.get_date_of_next() <= date.today():
                 scheduled.append(entry)
 
         shuffle(scheduled)
