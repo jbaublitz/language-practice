@@ -91,12 +91,7 @@ class GuiApplication(Adw.Application):
                 margin-left: 15px;
                 margin-right: 15px;
             }
-            
-            checkbutton {
-                marin-left: 15px;
-            }
-
-        """
+            """
         )
 
         Gtk.StyleContext.add_provider_for_display(
@@ -282,6 +277,7 @@ class MainWindow(Gtk.ApplicationWindow):
         Handle importing files on button press.
         """
         imports = [entry.get_path() for entry in dialog.open_multiple_finish(task)]
+
         for current_import in imports:
             try:
                 toml = TomlConfig(current_import)
