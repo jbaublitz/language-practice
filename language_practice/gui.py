@@ -154,6 +154,11 @@ class MainWindow(Gtk.ApplicationWindow):
         self.add_action(action)
         menu_model.append("Import database", "win.db_import")
 
+        action = Gio.SimpleAction.new("db_close")
+        action.connect("activate", self.db_close_button)
+        self.add_action(action)
+        menu_model.append("Close database", "win.db_close")
+
         action = Gio.SimpleAction.new("import")
         action.connect("activate", self.import_button)
         self.add_action(action)
@@ -237,6 +242,21 @@ class MainWindow(Gtk.ApplicationWindow):
             label = Gtk.Label(halign=Gtk.Align.START)
             label.set_text(flashcard_set)
             self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
+
+    #  pylint: disable=unused-argument
+    def db_close_button(self, action, param):
+        """
+        Handle database import button action.
+        """
+        if self.handle is None:
+            dialog = Gtk.AlertDialog()
+            dialog.set_message("No database to close")
+            dialog.set_modal(True)
+            dialog.choose()
+            return
+        self.flashcard_set_grid.clear()
+        self.handle.close()
+        self.handle = None
 
     #  pylint: disable=unused-argument
     def import_button(self, action, param):
@@ -409,6 +429,13 @@ class FlashcardSetGrid(Gtk.Grid):
                 files.append((self.get_child_at(1, row).get_text(), row))
 
         return files
+
+    def clear(self):
+        """
+        Clear all flashcard sets from the UI.
+        """
+        for i in reversed(range(self.num_rows)):
+            self.delete_row(i)
 
 
 class StudyWindow(Gtk.ApplicationWindow):
