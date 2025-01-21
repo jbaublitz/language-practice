@@ -55,14 +55,25 @@ class GuiApplication(Adw.Application):
                 margin-right: 15px;
             }
 
-            button {
+            button.main-buttons {
+                margin-top: 15px;
                 margin-bottom: 15px;
-                margin-left: 7px;
-                margin-right: 7px;
+                margin-left: 15px;
+                margin-right: 15px;
             }
 
-            label {
-                font-size: 20px;
+            button.study-buttons {
+                margin-left: 15px;
+                margin-right: 15px;
+            }
+
+            button.study-top {
+                margin-top: 15px;
+                margin-bottom: 15px;
+            }
+
+            button.study-bottom {
+                margin-bottom: 15px;
             }
 
             label.word {
@@ -79,6 +90,10 @@ class GuiApplication(Adw.Application):
                 margin-bottom: 15px;
                 margin-left: 15px;
                 margin-right: 15px;
+            }
+            
+            checkbutton {
+                marin-left: 15px;
             }
 
         """
@@ -98,10 +113,11 @@ class MainWindow(Gtk.ApplicationWindow):
     Main window for GUI application.
     """
 
+    # pylint: disable=too-many-statements
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.set_default_size(-1, 600)
+        self.set_default_size(600, 600)
 
         self.handle = None
         self.flashcard: Flashcard | None = None
@@ -113,32 +129,60 @@ class MainWindow(Gtk.ApplicationWindow):
         scrollable.set_vexpand(True)
         scrollable.set_child(self.flashcard_set_grid)
 
-        button_hbox = Gtk.Box(spacing=6)
-        db_create_button = Gtk.Button(label="Create database")
-        db_create_button.connect("clicked", self.db_create_button)
-        button_hbox.append(db_create_button)
-        db_import_button = Gtk.Button(label="Import database")
-        db_import_button.connect("clicked", self.db_import_button)
-        button_hbox.append(db_import_button)
-        import_button = Gtk.Button(label="Import")
-        import_button.connect("clicked", self.import_button)
-        button_hbox.append(import_button)
-        delete_button = Gtk.Button(label="Delete")
-        delete_button.connect("clicked", self.delete_flashcard_set)
-        button_hbox.append(delete_button)
+        button_hbox = Gtk.Box()
         select_all_button = Gtk.Button(label="Select all")
         select_all_button.connect("clicked", self.flashcard_set_grid.select_all)
+        select_all_button.set_css_classes(["main-buttons"])
         button_hbox.append(select_all_button)
         deselect_all_button = Gtk.Button(label="Deselect all")
         deselect_all_button.connect("clicked", self.flashcard_set_grid.deselect_all)
+        deselect_all_button.set_css_classes(["main-buttons"])
         button_hbox.append(deselect_all_button)
         start_button = Gtk.Button(label="Start")
         start_button.connect("clicked", self.handle_start)
+        start_button.set_css_classes(["main-buttons"])
         button_hbox.append(start_button)
         button_hbox.set_halign(Gtk.Align.CENTER)
 
         vbox.append(scrollable)
         vbox.append(button_hbox)
+
+        menu_model = Gio.Menu()
+
+        action = Gio.SimpleAction.new("db_create")
+        action.connect("activate", self.db_create_button)
+        self.add_action(action)
+        menu_model.append("Create database", "win.db_create")
+
+        action = Gio.SimpleAction.new("db_import")
+        action.connect("activate", self.db_import_button)
+        self.add_action(action)
+        menu_model.append("Import database", "win.db_import")
+
+        action = Gio.SimpleAction.new("import")
+        action.connect("activate", self.import_button)
+        self.add_action(action)
+        menu_model.append("Import set", "win.import")
+
+        action = Gio.SimpleAction.new("delete")
+        action.connect("activate", self.delete_flashcard_set)
+        self.add_action(action)
+        menu_model.append("Delete set", "win.delete")
+
+        popover = Gtk.PopoverMenu()
+        popover.set_menu_model(menu_model)
+        popover.set_position(Gtk.PositionType.BOTTOM)
+
+        menu_button = Gtk.MenuButton()
+        menu_button.set_popover(popover)
+        menu_button.set_icon_name("open-menu-symbolic")
+        menu_button.show()
+
+        headerbar = Gtk.HeaderBar()
+        headerbar.props.show_title_buttons = True
+        headerbar.pack_end(menu_button)
+        headerbar.show()
+        self.set_titlebar(headerbar)
 
         self.set_child(vbox)
 
@@ -153,7 +197,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self.handle.close()
 
     #  pylint: disable=unused-argument
-    def db_create_button(self, button: Gtk.Button):
+    def db_create_button(self, action, param):
         """
         Handle database creation button action.
         """
@@ -174,7 +218,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.handle = SqliteHandle(source.save_finish(res).get_path())
 
     #  pylint: disable=unused-argument
-    def db_import_button(self, button: Gtk.Button):
+    def db_import_button(self, action, param):
         """
         Handle database import button action.
         """
@@ -200,7 +244,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
 
     #  pylint: disable=unused-argument
-    def import_button(self, button: Gtk.Button):
+    def import_button(self, action, param):
         """
         Handle import button action.
         """
@@ -214,7 +258,7 @@ class MainWindow(Gtk.ApplicationWindow):
         file_dialog.open_multiple(callback=self.handle_files)
 
     #  pylint: disable=unused-argument
-    def delete_flashcard_set(self, button: Gtk.Button):
+    def delete_flashcard_set(self, action, param):
         """
         Handle deleting flashcard set on button press.
         """
@@ -291,7 +335,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
 
     #  pylint: disable=unused-argument
-    def handle_start(self, button: Gtk.Button):
+    def handle_start(self, button):
         """
         Handle starting flashcard study
         """
@@ -343,7 +387,7 @@ class FlashcardSetGrid(Gtk.Grid):
         self.num_rows -= 1
 
     #  pylint: disable=unused-argument
-    def select_all(self, button: Gtk.Button):
+    def select_all(self, button):
         """
         Mark all checkboxes as selected.
         """
@@ -351,7 +395,7 @@ class FlashcardSetGrid(Gtk.Grid):
             self.get_child_at(0, row).set_active(True)
 
     #  pylint: disable=unused-argument
-    def deselect_all(self, button: Gtk.Button):
+    def deselect_all(self, button):
         """
         Mark all checkboxes as selected.
         """
@@ -416,21 +460,27 @@ class StudyWindow(Gtk.ApplicationWindow):
         button_hbox_1 = Gtk.Box(spacing=6)
         zero = Gtk.Button(label="No recall")
         zero.connect("clicked", lambda button: self.grade(0))
+        zero.set_css_classes(["study-buttons", "study-top"])
         button_hbox_1.append(zero)
         one = Gtk.Button(label="Wrong, familiar")
         one.connect("clicked", lambda button: self.grade(1))
+        one.set_css_classes(["study-buttons", "study-top"])
         button_hbox_1.append(one)
         two = Gtk.Button(label="Wrong, easy to remember")
         two.connect("clicked", lambda button: self.grade(2))
+        two.set_css_classes(["study-buttons", "study-top"])
         button_hbox_1.append(two)
         three = Gtk.Button(label="Correct, hard")
         three.connect("clicked", lambda button: self.grade(3))
+        three.set_css_classes(["study-buttons", "study-top"])
         button_hbox_1.append(three)
         four = Gtk.Button(label="Correct, medium")
         four.connect("clicked", lambda button: self.grade(4))
+        four.set_css_classes(["study-buttons", "study-top"])
         button_hbox_1.append(four)
         five = Gtk.Button(label="Correct, easy")
         five.connect("clicked", lambda button: self.grade(5))
+        five.set_css_classes(["study-buttons", "study-top"])
         button_hbox_1.append(five)
         button_hbox_1.set_halign(Gtk.Align.CENTER)
 
@@ -443,15 +493,19 @@ class StudyWindow(Gtk.ApplicationWindow):
         button_hbox_2 = Gtk.Box(spacing=6)
         definition = Gtk.Button(label="Flashcard front")
         definition.connect("clicked", lambda button: self.initial_display())
+        definition.set_css_classes(["study-buttons", "study-bottom"])
         button_hbox_2.append(definition)
         back = Gtk.Button(label="Flashcard back")
         back.connect("clicked", lambda button: self.on_flashcard_back())
+        back.set_css_classes(["study-buttons", "study-bottom"])
         button_hbox_2.append(back)
         usage = Gtk.Button(label="Usage")
         usage.connect("clicked", lambda button: self.on_usage())
+        usage.set_css_classes(["study-buttons", "study-bottom"])
         button_hbox_2.append(usage)
         charts = Gtk.Button(label="Charts")
         charts.connect("clicked", lambda button: self.on_charts())
+        charts.set_css_classes(["study-buttons", "study-bottom"])
         button_hbox_2.append(charts)
         button_hbox_2.set_halign(Gtk.Align.CENTER)
 
