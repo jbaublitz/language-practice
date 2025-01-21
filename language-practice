@@ -11,7 +11,7 @@ Inflection charts are pulled from wiktionary.
 import argparse
 import sys
 
-from language_practice.gui import GuiApplication
+from language_practice.gui import GuiApplication, start_loop
 
 
 class Once(argparse.Action):
@@ -39,7 +39,8 @@ def main():
     args = parse.parse_args()
 
     try:
-        gui = GuiApplication(application_id="me.jbaublitz.LanguagePractice")
+        loop = start_loop()
+        gui = GuiApplication(loop, application_id="me.jbaublitz.LanguagePractice")
         gui.run()
     except Exception as err:  # pylint: disable=broad-exception-caught
         if args.traceback:
