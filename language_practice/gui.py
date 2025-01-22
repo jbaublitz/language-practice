@@ -6,8 +6,10 @@ Graphical user interface.
 #  pylint: disable=too-few-public-methods
 
 import asyncio
+import functools
 import tomllib
 from sqlite3 import IntegrityError
+from threading import Thread
 from typing import Self
 
 import gi  # type: ignore
@@ -17,6 +19,7 @@ gi.require_version("Adw", "1")
 from gi.repository import (  # type: ignore  # pylint: disable=wrong-import-order
     Adw,
     Gio,
+    GLib,
     Gtk,
 )
 
@@ -26,15 +29,25 @@ from language_practice.sqlite import SqliteHandle
 from language_practice.web import scrape
 
 
+def start_loop():
+    """
+    Start asyncio event loop
+    """
+    loop = asyncio.new_event_loop()
+    Thread(target=loop.run_forever, daemon=True).start()
+    return loop
+
+
 class GuiApplication(Adw.Application):
     """
     Graphical application.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, loop, **kwargs):
         super().__init__(**kwargs)
 
         self.win: None | MainWindow = None
+        self.loop = loop
 
         self.connect("activate", self.on_activate)
 
@@ -42,7 +55,7 @@ class GuiApplication(Adw.Application):
         """
         Handle window setup on activation of application.
         """
-        self.win = MainWindow(application=app)
+        self.win = MainWindow(self.loop, application=app)
         self.win.set_title("Language Practice")
 
         css = Gtk.CssProvider.new()
@@ -109,8 +122,10 @@ class MainWindow(Gtk.ApplicationWindow):
     """
 
     # pylint: disable=too-many-statements
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, loop, **kwargs):
+        super().__init__(**kwargs)
+
+        self.loop = loop
 
         self.set_default_size(600, 600)
 
@@ -299,56 +314,79 @@ class MainWindow(Gtk.ApplicationWindow):
         imports = [entry.get_path() for entry in dialog.open_multiple_finish(task)]
 
         for current_import in imports:
-            try:
-                toml = TomlConfig(current_import)
-            except tomllib.TOMLDecodeError as err:
-                dialog = Gtk.AlertDialog()
-                dialog.set_message(f"{current_import}: {err}")
-                dialog.set_modal(True)
-                dialog.choose()
-                continue
-            except UnicodeDecodeError as err:
-                dialog = Gtk.AlertDialog()
-                dialog.set_message(f"{current_import}: {err}")
-                dialog.set_modal(True)
-                dialog.choose()
-                continue
-            except RuntimeError as err:
-                dialog = Gtk.AlertDialog()
-                dialog.set_message(f"{current_import}: {err}")
-                dialog.set_modal(True)
-                dialog.choose()
-                continue
-
-            try:
-                new = self.handle.import_set(
-                    current_import,
-                    toml,
-                    asyncio.run(scrape(toml.get_words(), toml.get_lang())),
+            fut = asyncio.run_coroutine_threadsafe(
+                self.handle_single_import(current_import), self.loop
+            )
+            fut.add_done_callback(
+                functools.partial(
+                    GLib.idle_add, self.update_ui_when_done, current_import
                 )
-            except IntegrityError as err:
-                dialog = Gtk.AlertDialog()
-                dialog.set_message(f"{current_import}: {err}")
-                dialog.set_modal(True)
-                dialog.choose()
-                set_id = self.handle.get_id_from_file_name(current_import)
-                if set_id is not None:
-                    self.handle.delete_set(set_id)
-                continue
-            except RuntimeError as err:
-                dialog = Gtk.AlertDialog()
-                dialog.set_message(f"{current_import}: {err}")
-                dialog.set_modal(True)
-                dialog.choose()
-                set_id = self.handle.get_id_from_file_name(current_import)
-                if set_id is not None:
-                    self.handle.delete_set(set_id)
-                continue
+            )
 
-            if new:
-                label = Gtk.Label(halign=Gtk.Align.START)
-                label.set_text(current_import)
-                self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
+    async def handle_single_import(self, current_import: str):
+        """
+        Handle TOML parsing and web scraping.
+        """
+        try:
+            toml = TomlConfig(current_import)
+        except tomllib.TOMLDecodeError as err:
+            dialog = Gtk.AlertDialog()
+            dialog.set_message(f"{current_import}: {err}")
+            dialog.set_modal(True)
+            dialog.choose()
+            return (None, None)
+        except UnicodeDecodeError as err:
+            dialog = Gtk.AlertDialog()
+            dialog.set_message(f"{current_import}: {err}")
+            dialog.set_modal(True)
+            dialog.choose()
+            return (None, None)
+        except RuntimeError as err:
+            dialog = Gtk.AlertDialog()
+            dialog.set_message(f"{current_import}: {err}")
+            dialog.set_modal(True)
+            dialog.choose()
+            return (None, None)
+
+        return (toml, await scrape(toml.get_words(), toml.get_lang()))
+
+    def update_ui_when_done(self, current_import, future):
+        """
+        Handle updating the UI on future completion.
+        """
+        (toml, scraped) = future.result(10)
+        if toml is None or scraped is None:
+            return
+
+        try:
+            new = self.handle.import_set(
+                current_import,
+                toml,
+                scraped,
+            )
+        except IntegrityError as err:
+            dialog = Gtk.AlertDialog()
+            dialog.set_message(f"{current_import}: {err}")
+            dialog.set_modal(True)
+            dialog.choose()
+            set_id = self.handle.get_id_from_file_name(current_import)
+            if set_id is not None:
+                self.handle.delete_set(set_id)
+            return
+        except RuntimeError as err:
+            dialog = Gtk.AlertDialog()
+            dialog.set_message(f"{current_import}: {err}")
+            dialog.set_modal(True)
+            dialog.choose()
+            set_id = self.handle.get_id_from_file_name(current_import)
+            if set_id is not None:
+                self.handle.delete_set(set_id)
+            return
+
+        if new:
+            label = Gtk.Label(halign=Gtk.Align.START)
+            label.set_text(current_import)
+            self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
 
     #  pylint: disable=unused-argument
     def handle_start(self, button):
