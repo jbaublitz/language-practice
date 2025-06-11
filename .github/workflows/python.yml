@@ -35,7 +35,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libcairo-dev libgtk-4-dev cmake gobject-introspection libgirepository1.0-dev libadwaita-1-dev
+        sudo apt-get install -y libcairo-dev libgtk-4-dev cmake gobject-introspection libgirepository-2.0-dev libadwaita-1-dev
         python -m pip install --upgrade pip
         pip install .
         pip install mypy types-beautifulsoup4 types-requests
@@ -56,7 +56,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libcairo-dev libgtk-4-dev cmake gobject-introspection libgirepository1.0-dev libadwaita-1-dev
+        sudo apt-get install -y libcairo-dev libgtk-4-dev cmake gobject-introspection libgirepository-2.0-dev libadwaita-1-dev
         python -m pip install --upgrade pip
         pip install .
         pip install pylint
