@@ -27,6 +27,7 @@ class Entry:
         part_of_speech: str | None,
         charts: list[list[str]] | None,
         repetition: WordRepetition,
+        lang: str | None,
     ):
         self.word = word
         self.definition = definition
@@ -36,6 +37,7 @@ class Entry:
         self.part_of_speech = part_of_speech
         self.charts = charts
         self.repetition = repetition
+        self.lang = lang
 
     def get_word(self) -> str:
         """
@@ -85,14 +87,19 @@ class Entry:
         """
         return self.repetition
 
+    def get_lang(self) -> str | None:
+        """
+        Get the language associated with this word file, if any.
+        """
+        return self.lang
+
 
 class Config:
     """
     Generic config data structure.
     """
 
-    def __init__(self, lang: str | None, entries: list[Entry]):
-        self.lang = lang
+    def __init__(self, entries: list[Entry]):
         self.words = entries
 
     def __iter__(self):
@@ -100,12 +107,6 @@ class Config:
 
     def __len__(self) -> int:
         return len(self.words)
-
-    def get_lang(self) -> str | None:
-        """
-        Get the language associated with this word file, if any.
-        """
-        return self.lang
 
     def get_words(self) -> list[Entry]:
         """
@@ -117,12 +118,6 @@ class Config:
         """
         Extend a TOML config with another TOML config.
         """
-        if self.lang != config.lang:
-            raise RuntimeError(
-                f"Attempted to join a TOML config with lang {self.lang} with"
-                f"one with lang {config.lang}"
-            )
-
         self.words += config.words
         return self
 
@@ -144,10 +139,11 @@ class GraphicalConfig(Config):
                     dct.get("part_of_speech", None),
                     dct.get("charts", None),
                     WordRepetition(2.5, 0, 0, date.today(), False),
+                    lang,
                 )
                 for dct in dcts
             ]
-            super().__init__(lang, words)
+            super().__init__(words)
         except KeyError as err:
             raise RuntimeError(f"Key {err} not found") from err
 
@@ -177,9 +173,10 @@ class TomlConfig(Config):
                         dct.get("part_of_speech", None),
                         dct.get("charts", None),
                         WordRepetition(2.5, 0, 0, date.today(), False),
+                        lang,
                     )
                     for dct in toml["words"]
                 ]
-                super().__init__(lang, words)
+                super().__init__(words)
         except KeyError as err:
             raise RuntimeError(f"Key {err} not found") from err

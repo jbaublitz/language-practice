@@ -30,10 +30,18 @@ class StudyWindow(Gtk.ApplicationWindow):
             self.initial_display()
 
             vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             self.counter_label = Gtk.Label(halign=Gtk.Align.START)
             self.counter_label.set_text(f"{self.flashcard.flashcards_left()} left")
             self.counter_label.set_css_classes(["counter"])
-            vbox.append(self.counter_label)
+            self.lang_label = Gtk.Label(halign=Gtk.Align.START)
+            (entry, _) = self.flashcard.current()
+            if entry is not None:
+                self.lang_label.set_text(f"{entry.get_lang()}")
+                self.lang_label.set_css_classes(["lang"])
+            hbox.append(self.counter_label)
+            hbox.append(self.lang_label)
+            vbox.append(hbox)
             vbox.append(self.display_box)
             vbox.append(button_hbox_1)
             vbox.append(button_hbox_2)
@@ -109,6 +117,8 @@ class StudyWindow(Gtk.ApplicationWindow):
         """
         self.flashcard.post_grade()
         self.counter_label.set_text(f"{self.flashcard.flashcards_left()} left")
+        (entry, _) = self.flashcard.current()
+        self.lang_label.set_text(f"{entry.get_lang()}")
         (self.peek, self.is_review) = self.flashcard.current()
 
     def grade(self, grade: int):

@@ -45,10 +45,11 @@ class GuiApplication(Adw.Application):
     Graphical application.
     """
 
-    def __init__(self, loop, **kwargs):
+    def __init__(self, handle: SqliteHandle, loop, **kwargs):
         super().__init__(**kwargs)
 
         self.win: None | MainWindow = None
+        self.handle = handle
         self.loop = loop
 
         self.connect("activate", self.on_activate)
@@ -57,7 +58,7 @@ class GuiApplication(Adw.Application):
         """
         Handle window setup on activation of application.
         """
-        self.win = MainWindow(self.loop, application=app)
+        self.win = MainWindow(self.handle, self.loop, application=app)
         self.win.set_title("Language Practice")
 
         css = Gtk.CssProvider()
@@ -73,7 +74,8 @@ class GuiApplication(Adw.Application):
             }
 
             list > row:first-child {
-                border-radius: 8px 8px 0px 0px;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
             }
 
             list row {
@@ -90,7 +92,8 @@ class GuiApplication(Adw.Application):
             }
 
             list > row:last-child {
-                border-radius: 0px 0px 8px 8px;
+                border-bottom-left-radius: 8px;
+                border-bottom-right-radius: 8px;
                 border-bottom: 1px solid @borders;
             }
 
@@ -164,6 +167,14 @@ class GuiApplication(Adw.Application):
                 margin-left: 15px;
                 margin-right: 15px;
             }
+
+            label.lang {
+                font-size: 30px;
+                margin-top: 15px;
+                margin-bottom: 15px;
+                margin-left: 15px;
+                margin-right: 15px;
+            }
             """
         )
 
@@ -183,14 +194,15 @@ class MainWindow(Gtk.ApplicationWindow):
     """
 
     # pylint: disable=too-many-statements
-    def __init__(self, loop, **kwargs):
+    # pylint: disable=too-many-locals
+    def __init__(self, handle: SqliteHandle, loop, **kwargs):
         super().__init__(**kwargs)
 
         self.loop = loop
 
         self.set_default_size(600, 600)
 
-        self.handle = None
+        self.handle = handle
         self.search_scrollable = None
         self.flashcard: Flashcard | None = None
 
@@ -233,20 +245,10 @@ class MainWindow(Gtk.ApplicationWindow):
 
         menu_model = Gio.Menu()
 
-        action = Gio.SimpleAction.new("db_create")
-        action.connect("activate", self.db_create_button)
+        action = Gio.SimpleAction.new("recreate_database")
+        action.connect("activate", self.recreate_database)
         self.add_action(action)
-        menu_model.append("Create database", "win.db_create")
-
-        action = Gio.SimpleAction.new("db_import")
-        action.connect("activate", self.db_import_button)
-        self.add_action(action)
-        menu_model.append("Import database", "win.db_import")
-
-        action = Gio.SimpleAction.new("db_close")
-        action.connect("activate", self.db_close_button)
-        self.add_action(action)
-        menu_model.append("Close database", "win.db_close")
+        menu_model.append("Recreate database", "win.recreate_database")
 
         action = Gio.SimpleAction.new("import")
         action.connect("activate", self.import_button)
@@ -281,15 +283,11 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.set_child(self.vbox)
 
-        self.connect("destroy", self.on_destroy)
-
-    #  pylint: disable=unused-argument
-    def on_destroy(self):
-        """
-        Cleanup handler for application.
-        """
-        if self.handle is not None:
-            self.handle.close()
+        sets = self.handle.get_all_sets()
+        for flashcard_set in sets:
+            label = Gtk.Label(halign=Gtk.Align.START)
+            label.set_text(flashcard_set)
+            self.flashcard_sets.add_row(Gtk.CheckButton(), label)
 
     #  pylint: disable=unused-argument
     def toggle_search(self, button):
@@ -325,79 +323,21 @@ class MainWindow(Gtk.ApplicationWindow):
                 self.search_scrollable.set_child(search_grid)
                 self.vbox.append(self.search_scrollable)
 
-    #  pylint: disable=unused-argument
-    def db_create_button(self, action, param):
+    def recreate_database(self, action, param):
         """
-        Handle database creation button action.
+        Recreate the database.
         """
-        if self.handle is not None:
-            dialog = Gtk.AlertDialog()
-            dialog.set_message("Database already imported")
-            dialog.set_modal(True)
-            dialog.choose()
-            return
-        file_chooser = Gtk.FileDialog()
-        file_chooser.save(self, None, self.create, None)
-
-    #  pylint: disable=unused-argument
-    def create(self, source, res, data):
-        """
-        Database creation callback.
-        """
-        self.handle = SqliteHandle(source.save_finish(res).get_path())
-
-    #  pylint: disable=unused-argument
-    def db_import_button(self, action, param):
-        """
-        Handle database import button action.
-        """
-        if self.handle is not None:
-            dialog = Gtk.AlertDialog()
-            dialog.set_message("Database already imported")
-            dialog.set_modal(True)
-            dialog.choose()
-            return
-        file_chooser = Gtk.FileDialog()
-        file_chooser.open(self, None, self.open, None)
-
-    #  pylint: disable=unused-argument
-    def open(self, source, res, data):
-        """
-        Database import callback.
-        """
-        self.handle = SqliteHandle(source.open_finish(res).get_path())
-        sets = self.handle.get_all_sets()
-        for flashcard_set in sets:
-            label = Gtk.Label(halign=Gtk.Align.START)
-            label.set_text(flashcard_set)
-            self.flashcard_sets.add_row(Gtk.CheckButton(), label)
-
-    #  pylint: disable=unused-argument
-    def db_close_button(self, action, param):
-        """
-        Handle database import button action.
-        """
-        if self.handle is None:
-            dialog = Gtk.AlertDialog()
-            dialog.set_message("No database to close")
-            dialog.set_modal(True)
-            dialog.choose()
-            return
-        self.flashcard_sets.clear()
+        db_path = self.handle.db_path()
         self.handle.close()
-        self.handle = None
+        os.remove(db_path)
+        self.handle = SqliteHandle(db_path)
+        self.flashcard_sets.clear()
 
     #  pylint: disable=unused-argument
     def import_button(self, action, param):
         """
         Handle import button action.
         """
-        if self.handle is None:
-            dialog = Gtk.AlertDialog()
-            dialog.set_message("Must create or import database first")
-            dialog.set_modal(True)
-            dialog.choose()
-            return
         file_dialog = Gtk.FileDialog()
         file_dialog.open_multiple(callback=self.handle_files)
 
@@ -406,13 +346,6 @@ class MainWindow(Gtk.ApplicationWindow):
         """
         Handle deleting flashcard set on button press.
         """
-        if self.handle is None:
-            dialog = Gtk.AlertDialog()
-            dialog.set_message("Must create or import database first")
-            dialog.set_modal(True)
-            dialog.choose()
-            return
-
         selected = self.flashcard_sets.get_selected()
         selected.sort(reverse=True, key=lambda info: info[1])
         for text, row in selected:
@@ -462,7 +395,7 @@ class MainWindow(Gtk.ApplicationWindow):
             dialog.choose()
             return (None, None)
 
-        return (toml, await scrape(toml.get_words(), toml.get_lang()))
+        return (toml, await scrape(toml.get_words()))
 
     def update_ui_when_done(self, current_import, future):
         """
@@ -508,12 +441,6 @@ class MainWindow(Gtk.ApplicationWindow):
         """
         Handle starting flashcard study
         """
-        if self.handle is None:
-            dialog = Gtk.AlertDialog()
-            dialog.set_message("Must create or import database first")
-            dialog.set_modal(True)
-            dialog.choose()
-            return
         files = self.flashcard_sets.get_selected()
         config = None
         for text, _ in files:

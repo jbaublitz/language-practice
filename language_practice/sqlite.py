@@ -16,24 +16,30 @@ class SqliteHandle:
     """
 
     FLASHCARDS_TABLE_NAME = "flashcard_sets"
-    FLASHCARDS_SCHEMA = (
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, file_name TEXT, lang TEXT"
-    )
+    FLASHCARDS_SCHEMA = "id INTEGER PRIMARY KEY AUTOINCREMENT, file_name TEXT"
     WORD_TABLE_NAME = "words"
     WORD_SCHEMA = (
-        "word TEXT PRIMARY KEY NOT NULL, definition TEXT NOT NULL, gender TEXT, "
-        "aspect TEXT, usage TEXT, part_of_speech TEXT, easiness_factor REAL, "
-        "num_correct INTEGER, in_n_days INTEGER, date_of_next TEXT, review NUMERIC, "
-        "flashcard_set_id INTEGER, table_uuids TEXT"
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, "
+        "definition TEXT NOT NULL, gender TEXT, aspect TEXT, usage TEXT, "
+        "part_of_speech TEXT, easiness_factor REAL, num_correct INTEGER, "
+        "in_n_days INTEGER, date_of_next TEXT, review NUMERIC, "
+        "flashcard_set_id INTEGER, table_uuids TEXT, lang TEXT"
     )
 
     def __init__(self, db: str):
-        self.conn = sqlite3.connect(db)
+        self.db = db
+        self.conn = sqlite3.connect(self.db)
         self.cursor = self.conn.cursor()
 
         self.__create_table(
             SqliteHandle.FLASHCARDS_TABLE_NAME, SqliteHandle.FLASHCARDS_SCHEMA
         )
+
+    def db_path(self):
+        """
+        Get the path to the database.
+        """
+        return self.db
 
     def __create_table(self, name: str, schema: str):
         """
@@ -62,7 +68,8 @@ class SqliteHandle:
         """
         table_name = SqliteHandle.FLASHCARDS_TABLE_NAME
         res = self.cursor.execute(
-            f"SELECT id FROM {table_name} WHERE file_name = ?", (file_name,)
+            f"SELECT id FROM {table_name} WHERE file_name = ?",
+            (file_name,),
         )
         set_id = res.fetchone()
         if set_id is not None:
@@ -76,10 +83,9 @@ class SqliteHandle:
         """
         Update an existing flashcard set.
         """
-        lang = config.get_lang()
         self.cursor.execute(
-            f"UPDATE {SqliteHandle.FLASHCARDS_TABLE_NAME} SET lang = ? WHERE id = ?",
-            (lang, set_id),
+            f"UPDATE {SqliteHandle.FLASHCARDS_TABLE_NAME} WHERE id = ?",
+            (set_id,),
         )
 
         table_name = SqliteHandle.WORD_TABLE_NAME
@@ -129,6 +135,7 @@ class SqliteHandle:
         usage = entry.get_usage()
         part_of_speech = entry.get_part_of_speech()
         charts = entry.get_charts()
+        lang = entry.get_lang()
         repetition = entry.get_repetition()
         easiness_factor = repetition.get_easiness_factor()
         num_correct = repetition.get_num_correct()
@@ -166,7 +173,7 @@ class SqliteHandle:
                     column_names = ", ".join(columns)
                     value_places = ", ".join(["?" for _ in range(len(values))])
                     self.cursor.execute(
-                        f"INSERT OR IGNORE INTO '{table_uuid}' ({column_names}) "
+                        f"INSERT INTO '{table_uuid}' ({column_names}) "
                         f"VALUES({value_places})",
                         values,
                     )
@@ -207,10 +214,13 @@ class SqliteHandle:
             columns.append("table_uuids")
             table_uuid_str = ",".join(table_uuids)
             insert_values.append(table_uuid_str)
+        if lang is not None:
+            columns.append("lang")
+            insert_values.append(lang)
         column_names = ", ".join(columns)
         value_places = ", ".join(["?" for _ in range(len(insert_values))])
         self.cursor.execute(
-            f"INSERT OR IGNORE INTO words ({column_names}) VALUES({value_places})",
+            f"INSERT INTO words ({column_names}) VALUES({value_places})",
             insert_values,
         )
 
@@ -230,6 +240,7 @@ class SqliteHandle:
             final_charts = scraped
         else:
             final_charts = [charts]
+        lang = entry.get_lang()
 
         res = self.cursor.execute(
             f"SELECT table_uuids FROM '{SqliteHandle.WORD_TABLE_NAME}' where word = ?",
@@ -269,7 +280,7 @@ class SqliteHandle:
                     column_names = ", ".join(columns)
                     value_places = ", ".join(["?" for _ in range(len(values))])
                     self.cursor.execute(
-                        f"INSERT OR IGNORE INTO '{table_uuid}' ({column_names}) "
+                        f"INSERT INTO '{table_uuid}' ({column_names}) "
                         f"VALUES({value_places})",
                         values,
                     )
@@ -298,6 +309,9 @@ class SqliteHandle:
             table_uuid_str = ",".join(table_uuids)
             set_statements.append("table_uuids = ?")
             args.append(table_uuid_str)
+        if lang is not None:
+            set_statements.append("lang = ?")
+            args.append(lang)
 
         all_set_statements = ", ".join(set_statements)
         self.cursor.execute(
@@ -311,12 +325,8 @@ class SqliteHandle:
         """
         Create a new flashcard set.
         """
-        lang = config.get_lang()
         columns = ["file_name"]
         values = [file_name]
-        if lang is not None:
-            columns.append("lang")
-            values.append(lang)
         column_names = ", ".join(columns)
         value_places = ", ".join(["?" for _ in range(len(values))])
         self.cursor.execute(
@@ -392,15 +402,11 @@ class SqliteHandle:
         Load config from database.
         """
         set_id = self.get_id_from_file_name(file_name)
-        res = self.cursor.execute(
-            "SELECT lang FROM flashcard_sets WHERE file_name = ?", (file_name,)
-        )
-        lang = res.fetchall()[0]
 
         res = self.cursor.execute(
             "SELECT word, definition, gender, aspect, usage, part_of_speech, "
             "easiness_factor, num_correct, in_n_days, date_of_next, review, "
-            "table_uuids FROM 'words' WHERE flashcard_set_id = ?",
+            "table_uuids, lang FROM 'words' WHERE flashcard_set_id = ?",
             (set_id,),
         )
         entries = res.fetchall()
@@ -420,6 +426,7 @@ class SqliteHandle:
                 date_of_next,
                 review,
                 table_uuids,
+                lang,
             ) = entry
             date_of_next = date.fromisoformat(date_of_next)
             review = review != 0
@@ -448,10 +455,11 @@ class SqliteHandle:
                             date_of_next,
                             review,
                         ),
+                        lang,
                     )
                 )
 
-        return Config(lang, loaded_entries)
+        return Config(loaded_entries)
 
     def update_config(self, word: str, repetition: WordRepetition):
         """
