@@ -7,6 +7,7 @@ Graphical user interface.
 
 import asyncio
 import functools
+import os
 import tomllib
 from sqlite3 import IntegrityError
 from threading import Thread
@@ -361,9 +362,10 @@ class MainWindow(Gtk.ApplicationWindow):
         if toml is None or scraped is None:
             return
 
+        (set_name, _) = os.path.splitext(os.path.basename(current_import))
         try:
             new = self.handle.import_set(
-                current_import,
+                set_name,
                 toml,
                 scraped,
             )
@@ -372,7 +374,7 @@ class MainWindow(Gtk.ApplicationWindow):
             dialog.set_message(f"{current_import}: {err}")
             dialog.set_modal(True)
             dialog.choose()
-            set_id = self.handle.get_id_from_file_name(current_import)
+            set_id = self.handle.get_id_from_file_name(set_name)
             if set_id is not None:
                 self.handle.delete_set(set_id)
             return
@@ -381,14 +383,14 @@ class MainWindow(Gtk.ApplicationWindow):
             dialog.set_message(f"{current_import}: {err}")
             dialog.set_modal(True)
             dialog.choose()
-            set_id = self.handle.get_id_from_file_name(current_import)
+            set_id = self.handle.get_id_from_file_name(set_name)
             if set_id is not None:
                 self.handle.delete_set(set_id)
             return
 
         if new:
             label = Gtk.Label(halign=Gtk.Align.START)
-            label.set_text(current_import)
+            label.set_text(set_name)
             self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
 
     #  pylint: disable=unused-argument
