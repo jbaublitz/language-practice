@@ -62,11 +62,52 @@ class GuiApplication(Adw.Application):
         css = Gtk.CssProvider()
         css.load_from_string(
             """
-            grid {
+            list {
+                background-color: @theme_bg_color;
+                color: @theme_text_color;
                 margin-top: 15px;
                 margin-bottom: 15px;
                 margin-left: 15px;
                 margin-right: 15px;
+            }
+
+            list > row:first-child {
+                border-radius: 8px 8px 0px 0px;
+            }
+
+            list row {
+                background-color: hsl(from @theme_bg_color calc(h - 2) calc(s - 2) calc(l - 2));
+                padding: 12px;
+                transition: background 150ms ease;
+                border-top: 1px solid @borders;
+                border-left: 1px solid @borders;
+                border-right: 1px solid @borders;
+            }
+            
+            list row label {
+                margin-left: 20px;
+            }
+
+            list > row:last-child {
+                border-radius: 0px 0px 8px 8px;
+                border-bottom: 1px solid @borders;
+            }
+
+            grid {
+                margin-left: 10px;
+                margin-right: 10px;
+                margin-bottom: 10px;
+                margin-top: 10px;
+            }
+
+            grid label {
+                background-color: hsl(from @theme_bg_color calc(h - 2) calc(s - 2) calc(l - 2));
+                border-top: 1px solid @borders;
+                border-left: 1px solid @borders;
+                border-right: 1px solid @borders;
+                border-bottom: 1px solid @borders;
+                border-radius: 6px;
+                padding: 10px;
             }
 
             button.main-buttons {
@@ -76,18 +117,35 @@ class GuiApplication(Adw.Application):
                 margin-right: 15px;
             }
 
-            button.study-buttons {
-                margin-left: 15px;
-                margin-right: 15px;
+            button.study-top {
+                border-radius: 0px 0px 0px 0px;
+                margin-bottom: 5px;
             }
 
-            button.study-top {
-                margin-top: 15px;
-                margin-bottom: 15px;
+            box button.study-top:last-child {
+                border-radius: 0px 6px 6px 0px;
+                margin-right: 10px;
+            }
+
+            box button.study-top:first-child {
+                border-radius: 6px 0px 0px 6px;
+                margin-left: 10px;
             }
 
             button.study-bottom {
-                margin-bottom: 15px;
+                border-radius: 0px 0px 0px 0px;
+                margin-top: 5px;
+                margin-bottom: 10px;
+            }
+
+            box button.study-bottom:last-child {
+                border-radius: 0px 6px 6px 0px;
+                margin-right: 10px;
+            }
+
+            box button.study-bottom:first-child {
+                border-radius: 6px 0px 0px 6px;
+                margin-left: 10px;
             }
 
             label.word {
@@ -146,20 +204,22 @@ class MainWindow(Gtk.ApplicationWindow):
         self.searchbar.set_child(searchentry)
         self.vbox.append(self.searchbar)
 
-        self.flashcard_set_grid = FlashcardSetGrid()
+        self.flashcard_sets = FlashcardListBox()
         self.scrollable = Gtk.ScrolledWindow()
         self.scrollable.set_vexpand(True)
-        self.scrollable.set_child(self.flashcard_set_grid)
+        self.scrollable.set_child(self.flashcard_sets)
 
         self.button_hbox = Gtk.Box()
         select_all_button = Gtk.Button()
         select_all_button.set_icon_name("edit-select-all")
-        select_all_button.connect("clicked", self.flashcard_set_grid.select_all)
+        select_all_button.connect("clicked", self.flashcard_sets.select_all_checks)
         select_all_button.set_css_classes(["main-buttons"])
         self.button_hbox.append(select_all_button)
         deselect_all_button = Gtk.Button()
         deselect_all_button.set_icon_name("edit-clear-all")
-        deselect_all_button.connect("clicked", self.flashcard_set_grid.deselect_all)
+        deselect_all_button.connect(
+            "clicked", self.flashcard_sets.deselect_all_checks
+        )
         deselect_all_button.set_css_classes(["main-buttons"])
         self.button_hbox.append(deselect_all_button)
         start_button = Gtk.Button()
@@ -257,7 +317,7 @@ class MainWindow(Gtk.ApplicationWindow):
                     self.vbox.remove(self.scrollable)
                 if self.vbox == self.button_hbox.get_parent():
                     self.vbox.remove(self.button_hbox)
-                search_grid = SearchGrid()
+                search_grid = SearchListBox()
                 res = self.handle.search(text)
                 for tup in res:
                     search_grid.add_row(tup)
@@ -311,7 +371,7 @@ class MainWindow(Gtk.ApplicationWindow):
         for flashcard_set in sets:
             label = Gtk.Label(halign=Gtk.Align.START)
             label.set_text(flashcard_set)
-            self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
+            self.flashcard_sets.add_row(Gtk.CheckButton(), label)
 
     #  pylint: disable=unused-argument
     def db_close_button(self, action, param):
@@ -324,7 +384,7 @@ class MainWindow(Gtk.ApplicationWindow):
             dialog.set_modal(True)
             dialog.choose()
             return
-        self.flashcard_set_grid.clear()
+        self.flashcard_sets.clear()
         self.handle.close()
         self.handle = None
 
@@ -354,13 +414,13 @@ class MainWindow(Gtk.ApplicationWindow):
             dialog.choose()
             return
 
-        selected = self.flashcard_set_grid.get_selected()
+        selected = self.flashcard_sets.get_selected()
         selected.sort(reverse=True, key=lambda info: info[1])
         for text, row in selected:
             set_id = self.handle.get_id_from_file_name(text)
             if set_id is not None:
                 self.handle.delete_set(set_id)
-            self.flashcard_set_grid.delete_row(row)
+            self.flashcard_sets.delete_row(row)
 
     def handle_files(self, dialog: Gtk.FileDialog, task: Gio.Task):
         """
@@ -442,7 +502,7 @@ class MainWindow(Gtk.ApplicationWindow):
         if new:
             label = Gtk.Label(halign=Gtk.Align.START)
             label.set_text(set_name)
-            self.flashcard_set_grid.add_row(Gtk.CheckButton(), label)
+            self.flashcard_sets.add_row(Gtk.CheckButton(), label)
 
     #  pylint: disable=unused-argument
     def handle_start(self, button):
@@ -455,7 +515,7 @@ class MainWindow(Gtk.ApplicationWindow):
             dialog.set_modal(True)
             dialog.choose()
             return
-        files = self.flashcard_set_grid.get_selected()
+        files = self.flashcard_sets.get_selected()
         config = None
         for text, _ in files:
             if config is None:
@@ -469,48 +529,51 @@ class MainWindow(Gtk.ApplicationWindow):
             win.present()
 
 
-class FlashcardSetGrid(Gtk.Grid):
+class FlashcardListBox(Gtk.ListBox):
     """
-    Grid used for flashcard sets.
+    List box used for flashcard sets.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.set_column_spacing(15)
-        self.set_row_spacing(15)
-        self.num_rows = 0
-
     def add_row(self, checkbox: Gtk.CheckButton, label: Gtk.Label):
         """
         Add a row to the grid.
         """
-        self.attach(checkbox, 0, self.num_rows, 1, 1)
-        self.attach(label, 1, self.num_rows, 1, 1)
-        self.num_rows += 1
+        listboxrow = Gtk.ListBoxRow()
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(checkbox)
+        box.append(label)
+        listboxrow.set_child(box)
+        self.append(listboxrow)
 
-    def delete_row(self, row):
+    def delete_row(self, row: int):
         """
         Delete a row from the grid.
         """
-        self.remove_row(row)
-        self.num_rows -= 1
+        row = self.get_row_at_index(row)
+        self.remove(row)
 
     #  pylint: disable=unused-argument
-    def select_all(self, button):
+    def select_all_checks(self, button):
         """
         Mark all checkboxes as selected.
         """
-        for row in range(self.num_rows):
-            self.get_child_at(0, row).set_active(True)
+        for row in self:
+            box = row.get_child()
+            (checkbox, _) = list(box)
+            checkbox.set_active(True)
 
     #  pylint: disable=unused-argument
-    def deselect_all(self, button):
+    def deselect_all_checks(self, button):
         """
         Mark all checkboxes as selected.
         """
-        for row in range(self.num_rows):
-            self.get_child_at(0, row).set_active(False)
+        for row in self:
+            box = row.get_child()
+            (checkbox, _) = list(box)
+            checkbox.set_active(False)
 
     #  pylint: disable=unused-argument
     def get_selected(self) -> list[tuple[str, int]]:
@@ -518,9 +581,11 @@ class FlashcardSetGrid(Gtk.Grid):
         Get all selected flashcard sets.
         """
         files = []
-        for row in range(self.num_rows):
-            if self.get_child_at(0, row).get_active():
-                files.append((self.get_child_at(1, row).get_text(), row))
+        for row_num, row in enumerate(self):
+            box = row.get_child()
+            (checkbox, label) = list(box)
+            if checkbox.get_active():
+                files.append((label.get_text(), row_num))
 
         return files
 
@@ -528,8 +593,8 @@ class FlashcardSetGrid(Gtk.Grid):
         """
         Clear all flashcard sets from the UI.
         """
-        for i in reversed(range(self.num_rows)):
-            self.delete_row(i)
+        for row in list(self):
+            self.remove(row)
 
 
 class StudyWindow(Gtk.ApplicationWindow):
@@ -554,7 +619,7 @@ class StudyWindow(Gtk.ApplicationWindow):
             self.display_box.set_vexpand(True)
             self.initial_display()
 
-            vbox = Gtk.Box(spacing=6, orientation=Gtk.Orientation.VERTICAL)
+            vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             self.counter_label = Gtk.Label(halign=Gtk.Align.START)
             self.counter_label.set_text(f"{self.flashcard.flashcards_left()} left")
             self.counter_label.set_css_classes(["counter"])
@@ -574,7 +639,7 @@ class StudyWindow(Gtk.ApplicationWindow):
         """
         Set up button box for grading.
         """
-        button_hbox_1 = Gtk.Box(spacing=6)
+        button_hbox_1 = Gtk.Box()
         zero = Gtk.Button(label="No recall")
         zero.connect("clicked", lambda button: self.grade(0))
         zero.set_css_classes(["study-buttons", "study-top"])
@@ -607,7 +672,7 @@ class StudyWindow(Gtk.ApplicationWindow):
         """
         Set up button box for navigation.
         """
-        button_hbox_2 = Gtk.Box(spacing=6)
+        button_hbox_2 = Gtk.Box()
         definition = Gtk.Button(label="Flashcard front")
         definition.connect("clicked", lambda button: self.initial_display())
         definition.set_css_classes(["study-buttons", "study-bottom"])
@@ -714,8 +779,6 @@ class StudyWindow(Gtk.ApplicationWindow):
             if charts is not None:
                 for chart in charts:
                     grid = Gtk.Grid()
-                    grid.set_column_spacing(10)
-                    grid.set_row_spacing(10)
                     for i, row in enumerate(chart):
                         for j, col_val in enumerate(row):
                             grid.attach(Gtk.Label.new(col_val), j, i, 1, 1)
@@ -725,34 +788,32 @@ class StudyWindow(Gtk.ApplicationWindow):
             self.display_box.set_child(vbox)
 
 
-class SearchGrid(Gtk.Grid):
+class SearchListBox(Gtk.ListBox):
     """
-    Grid used for search.
+    List box used for search.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.set_column_spacing(15)
-        self.set_row_spacing(15)
-        self.num_rows = 0
-
     def add_row(self, entries: tuple[str, str, str]):
         """
         Add a row to the grid.
         """
+        row = Gtk.ListBoxRow()
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         (word, definition, usage) = entries
         word_label = Gtk.Label()
         word_label.set_text(word)
+        box.append(word_label)
         def_label = Gtk.Label()
         def_label.set_text(definition)
+        box.append(def_label)
         if usage is not None:
             usage_label = Gtk.Label()
             usage_label.set_text(usage)
+            box.append(usage_label)
         else:
             usage_label = None
-        self.attach(word_label, 0, self.num_rows, 1, 1)
-        self.attach(def_label, 1, self.num_rows, 1, 1)
-        if usage_label is not None:
-            self.attach(usage_label, 2, self.num_rows, 1, 1)
-        self.num_rows += 1
+        row.set_child(box)
+        self.append(row)
