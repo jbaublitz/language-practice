@@ -117,6 +117,7 @@ class GuiApplication(Adw.Application):
         self.win.present()
 
 
+# pylint: disable=too-many-instance-attributes
 class MainWindow(Gtk.ApplicationWindow):
     """
     Main window for GUI application.
@@ -131,35 +132,45 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_default_size(600, 600)
 
         self.handle = None
+        self.search_scrollable = None
         self.flashcard: Flashcard | None = None
 
-        vbox = Gtk.Box(spacing=6, orientation=Gtk.Orientation.VERTICAL)
+        self.vbox = Gtk.Box(spacing=6, orientation=Gtk.Orientation.VERTICAL)
+
+        self.searchbar = Gtk.SearchBar()
+        self.searchbar.set_hexpand(True)
+        searchentry = Gtk.SearchEntry()
+        searchentry.set_hexpand(True)
+        searchentry.connect("changed", self.on_key_event)
+        self.searchbar.connect_entry(searchentry)
+        self.searchbar.set_child(searchentry)
+        self.vbox.append(self.searchbar)
 
         self.flashcard_set_grid = FlashcardSetGrid()
-        scrollable = Gtk.ScrolledWindow()
-        scrollable.set_vexpand(True)
-        scrollable.set_child(self.flashcard_set_grid)
+        self.scrollable = Gtk.ScrolledWindow()
+        self.scrollable.set_vexpand(True)
+        self.scrollable.set_child(self.flashcard_set_grid)
 
-        button_hbox = Gtk.Box()
+        self.button_hbox = Gtk.Box()
         select_all_button = Gtk.Button()
         select_all_button.set_icon_name("edit-select-all")
         select_all_button.connect("clicked", self.flashcard_set_grid.select_all)
         select_all_button.set_css_classes(["main-buttons"])
-        button_hbox.append(select_all_button)
+        self.button_hbox.append(select_all_button)
         deselect_all_button = Gtk.Button()
         deselect_all_button.set_icon_name("edit-clear-all")
         deselect_all_button.connect("clicked", self.flashcard_set_grid.deselect_all)
         deselect_all_button.set_css_classes(["main-buttons"])
-        button_hbox.append(deselect_all_button)
+        self.button_hbox.append(deselect_all_button)
         start_button = Gtk.Button()
         start_button.set_icon_name("media-playback-start")
         start_button.connect("clicked", self.handle_start)
         start_button.set_css_classes(["main-buttons"])
-        button_hbox.append(start_button)
-        button_hbox.set_halign(Gtk.Align.CENTER)
+        self.button_hbox.append(start_button)
+        self.button_hbox.set_halign(Gtk.Align.CENTER)
 
-        vbox.append(scrollable)
-        vbox.append(button_hbox)
+        self.vbox.append(self.scrollable)
+        self.vbox.append(self.button_hbox)
 
         menu_model = Gio.Menu()
 
@@ -197,13 +208,19 @@ class MainWindow(Gtk.ApplicationWindow):
         menu_button.set_icon_name("open-menu-symbolic")
         menu_button.show()
 
+        search_button = Gtk.Button()
+        search_button.set_icon_name("system-search")
+        search_button.connect("clicked", self.toggle_search)
+        search_button.show()
+
         headerbar = Gtk.HeaderBar()
         headerbar.props.show_title_buttons = True
         headerbar.pack_end(menu_button)
+        headerbar.pack_end(search_button)
         headerbar.show()
         self.set_titlebar(headerbar)
 
-        self.set_child(vbox)
+        self.set_child(self.vbox)
 
         self.connect("destroy", self.on_destroy)
 
@@ -214,6 +231,40 @@ class MainWindow(Gtk.ApplicationWindow):
         """
         if self.handle is not None:
             self.handle.close()
+
+    #  pylint: disable=unused-argument
+    def toggle_search(self, button):
+        """
+        Toggle the search mode on or off.
+        """
+        searchmode = self.searchbar.get_search_mode()
+        self.searchbar.set_search_mode(not searchmode)
+
+    def on_key_event(self, entry):
+        """
+        Handle typing in the search bar.
+        """
+        if self.handle is not None:
+            text = entry.get_text()
+            if text == "":
+                self.vbox.remove(self.search_scrollable)
+                self.vbox.append(self.scrollable)
+                self.vbox.append(self.button_hbox)
+            else:
+                if self.search_scrollable is not None:
+                    self.vbox.remove(self.search_scrollable)
+                if self.vbox == self.scrollable.get_parent():
+                    self.vbox.remove(self.scrollable)
+                if self.vbox == self.button_hbox.get_parent():
+                    self.vbox.remove(self.button_hbox)
+                search_grid = SearchGrid()
+                res = self.handle.search(text)
+                for tup in res:
+                    search_grid.add_row(tup)
+                self.search_scrollable = Gtk.ScrolledWindow()
+                self.search_scrollable.set_vexpand(True)
+                self.search_scrollable.set_child(search_grid)
+                self.vbox.append(self.search_scrollable)
 
     #  pylint: disable=unused-argument
     def db_create_button(self, action, param):
@@ -672,3 +723,36 @@ class StudyWindow(Gtk.ApplicationWindow):
                     vbox.append(grid)
 
             self.display_box.set_child(vbox)
+
+
+class SearchGrid(Gtk.Grid):
+    """
+    Grid used for search.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.set_column_spacing(15)
+        self.set_row_spacing(15)
+        self.num_rows = 0
+
+    def add_row(self, entries: tuple[str, str, str]):
+        """
+        Add a row to the grid.
+        """
+        (word, definition, usage) = entries
+        word_label = Gtk.Label()
+        word_label.set_text(word)
+        def_label = Gtk.Label()
+        def_label.set_text(definition)
+        if usage is not None:
+            usage_label = Gtk.Label()
+            usage_label.set_text(usage)
+        else:
+            usage_label = None
+        self.attach(word_label, 0, self.num_rows, 1, 1)
+        self.attach(def_label, 1, self.num_rows, 1, 1)
+        if usage_label is not None:
+            self.attach(usage_label, 2, self.num_rows, 1, 1)
+        self.num_rows += 1

@@ -374,6 +374,19 @@ class SqliteHandle:
         )
         self.conn.commit()
 
+    def search(self, text: str) -> list[tuple[str, str, str]]:
+        """
+        Fuzzy match against all words, definitions, and usages that contain the given
+        string.
+        """
+        like = f"%{text}%"
+        res = self.cursor.execute(
+            "SELECT word, definition, usage FROM words WHERE word LIKE ? OR "
+            "definition LIKE ? OR usage LIKE ?",
+            (like, like, like),
+        )
+        return res.fetchall()
+
     def load_config(self, file_name: str) -> Config:
         """
         Load config from database.
