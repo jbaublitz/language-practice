@@ -58,7 +58,7 @@ class GuiApplication(Adw.Application):
         self.win = MainWindow(self.loop, application=app)
         self.win.set_title("Language Practice")
 
-        css = Gtk.CssProvider.new()
+        css = Gtk.CssProvider()
         css.load_from_string(
             """
             grid {
