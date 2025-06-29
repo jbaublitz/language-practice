@@ -42,15 +42,13 @@ async def fetch(
         raise RuntimeError(f"Error fetching word {word}") from err
 
 
-async def scrape(
-    words: list[Entry], lang: str | None
-) -> dict[str, list[list[list[str]]]]:
+async def scrape(words: list[Entry]) -> dict[str, list[list[list[str]]]]:
     """
     Fetch all words asynchronously.
     """
     async with aiohttp.ClientSession() as session:
         ret = await asyncio.gather(
-            *[fetch(session, word.get_word(), lang) for word in words]
+            *[fetch(session, word.get_word(), word.get_lang()) for word in words]
         )
         scraped_info = {}
         for word, info in ret:

@@ -2,9 +2,12 @@
 Handles TOML parsing from the configuration file.
 """
 
+import os
 from datetime import date
 from tomllib import load
 from typing import Any, Self
+
+import tomli_w
 
 from language_practice.repetition import WordRepetition
 
@@ -27,6 +30,7 @@ class Entry:
         part_of_speech: str | None,
         charts: list[list[str]] | None,
         repetition: WordRepetition,
+        lang: str | None,
     ):
         self.word = word
         self.definition = definition
@@ -36,6 +40,7 @@ class Entry:
         self.part_of_speech = part_of_speech
         self.charts = charts
         self.repetition = repetition
+        self.lang = lang
 
     def get_word(self) -> str:
         """
@@ -85,14 +90,20 @@ class Entry:
         """
         return self.repetition
 
+    def get_lang(self) -> str | None:
+        """
+        Get the language associated with this word file, if any.
+        """
+        return self.lang
+
 
 class Config:
     """
     Generic config data structure.
     """
 
-    def __init__(self, lang: str | None, entries: list[Entry]):
-        self.lang = lang
+    def __init__(self, set_name: str, entries: list[Entry]):
+        self.set_name = set_name
         self.words = entries
 
     def __iter__(self):
@@ -100,12 +111,6 @@ class Config:
 
     def __len__(self) -> int:
         return len(self.words)
-
-    def get_lang(self) -> str | None:
-        """
-        Get the language associated with this word file, if any.
-        """
-        return self.lang
 
     def get_words(self) -> list[Entry]:
         """
@@ -117,14 +122,40 @@ class Config:
         """
         Extend a TOML config with another TOML config.
         """
-        if self.lang != config.lang:
-            raise RuntimeError(
-                f"Attempted to join a TOML config with lang {self.lang} with"
-                f"one with lang {config.lang}"
-            )
-
         self.words += config.words
         return self
+
+    def validate_lang(self) -> str | None:
+        """
+        Returns the language for the config or, if the language is not consistent,
+        raise an exception.
+        """
+        lang = set(config.get_lang() for config in self.words)
+        if len(lang) > 1:
+            raise RuntimeError(
+                "All entries in a config are required to have the same language"
+            )
+        return lang.pop()
+
+    def export(self, export_dest: str):
+        """
+        Export the config to a TOML file.
+        """
+        dct: dict[str, Any] = {"words": []}
+        lang = self.validate_lang()
+        if lang is not None:
+            dct["lang"] = lang
+
+        for entry in self.words:
+            parsed_dct = {
+                k: v
+                for k, v in entry.__dict__.items()
+                if k not in ("lang", "repetition") and v is not None
+            }
+            dct["words"].append(parsed_dct)
+
+        with open(os.path.join(export_dest, self.set_name), "w", encoding="utf8") as f:
+            f.write(tomli_w.dumps(dct))
 
 
 class GraphicalConfig(Config):
@@ -132,7 +163,7 @@ class GraphicalConfig(Config):
     All entries in the graphical config.
     """
 
-    def __init__(self, lang: str | None, dcts: list[dict[str, Any]]):
+    def __init__(self, set_name: str, lang: str | None, dcts: list[dict[str, Any]]):
         try:
             words = [
                 Entry(
@@ -144,10 +175,11 @@ class GraphicalConfig(Config):
                     dct.get("part_of_speech", None),
                     dct.get("charts", None),
                     WordRepetition(2.5, 0, 0, date.today(), False),
+                    lang,
                 )
                 for dct in dcts
             ]
-            super().__init__(lang, words)
+            super().__init__(set_name, words)
         except KeyError as err:
             raise RuntimeError(f"Key {err} not found") from err
 
@@ -177,9 +209,10 @@ class TomlConfig(Config):
                         dct.get("part_of_speech", None),
                         dct.get("charts", None),
                         WordRepetition(2.5, 0, 0, date.today(), False),
+                        lang,
                     )
                     for dct in toml["words"]
                 ]
-                super().__init__(lang, words)
+                super().__init__(file_path, words)
         except KeyError as err:
             raise RuntimeError(f"Key {err} not found") from err
