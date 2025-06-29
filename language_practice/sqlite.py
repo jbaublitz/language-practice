@@ -459,7 +459,72 @@ class SqliteHandle:
                     )
                 )
 
-        return Config(loaded_entries)
+        return Config(file_name, loaded_entries)
+
+    def export_config(self, file_name: str) -> Config:
+        """
+        Load config from database.
+        """
+        set_id = self.get_id_from_file_name(file_name)
+
+        res = self.cursor.execute(
+            "SELECT word, definition, gender, aspect, usage, part_of_speech, "
+            "easiness_factor, num_correct, in_n_days, date_of_next, review, "
+            "table_uuids, lang FROM 'words' WHERE flashcard_set_id = ?",
+            (set_id,),
+        )
+        entries = res.fetchall()
+
+        loaded_entries = []
+        for entry in entries:
+            (
+                word,
+                definition,
+                gender,
+                aspect,
+                usage,
+                part_of_speech,
+                easiness_factor,
+                num_correct,
+                in_n_days,
+                date_of_next,
+                review,
+                table_uuids,
+                lang,
+            ) = entry
+            date_of_next = date.fromisoformat(date_of_next)
+            review = review != 0
+
+            charts = []
+            if table_uuids is not None:
+                for name in table_uuids.split(","):
+                    res = self.cursor.execute(f"SELECT * FROM '{name}';")
+                    chart = [
+                        [x if x is not None else "" for x in l] for l in res.fetchall()
+                    ]
+                    charts.append(chart)
+
+            loaded_entries.append(
+                Entry(
+                    word,
+                    definition,
+                    gender,
+                    aspect,
+                    usage,
+                    part_of_speech,
+                    charts,
+                    WordRepetition(
+                        easiness_factor,
+                        num_correct,
+                        in_n_days,
+                        date_of_next,
+                        review,
+                    ),
+                    lang,
+                )
+            )
+
+        return Config(file_name, loaded_entries)
 
     def update_config(self, word: str, repetition: WordRepetition):
         """

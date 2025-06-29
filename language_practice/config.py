@@ -2,9 +2,12 @@
 Handles TOML parsing from the configuration file.
 """
 
+import os
 from datetime import date
 from tomllib import load
 from typing import Any, Self
+
+import tomli_w
 
 from language_practice.repetition import WordRepetition
 
@@ -99,7 +102,8 @@ class Config:
     Generic config data structure.
     """
 
-    def __init__(self, entries: list[Entry]):
+    def __init__(self, set_name: str, entries: list[Entry]):
+        self.set_name = set_name
         self.words = entries
 
     def __iter__(self):
@@ -121,13 +125,45 @@ class Config:
         self.words += config.words
         return self
 
+    def validate_lang(self) -> str | None:
+        """
+        Returns the language for the config or, if the language is not consistent,
+        raise an exception.
+        """
+        lang = set(config.get_lang() for config in self.words)
+        if len(lang) > 1:
+            raise RuntimeError(
+                "All entries in a config are required to have the same language"
+            )
+        return lang.pop()
+
+    def export(self, export_dest: str):
+        """
+        Export the config to a TOML file.
+        """
+        dct: dict[str, Any] = {"words": []}
+        lang = self.validate_lang()
+        if lang is not None:
+            dct["lang"] = lang
+
+        for entry in self.words:
+            parsed_dct = {
+                k: v
+                for k, v in entry.__dict__.items()
+                if k not in ("lang", "repetition") and v is not None
+            }
+            dct["words"].append(parsed_dct)
+
+        with open(os.path.join(export_dest, self.set_name), "w", encoding="utf8") as f:
+            f.write(tomli_w.dumps(dct))
+
 
 class GraphicalConfig(Config):
     """
     All entries in the graphical config.
     """
 
-    def __init__(self, lang: str | None, dcts: list[dict[str, Any]]):
+    def __init__(self, set_name: str, lang: str | None, dcts: list[dict[str, Any]]):
         try:
             words = [
                 Entry(
@@ -143,7 +179,7 @@ class GraphicalConfig(Config):
                 )
                 for dct in dcts
             ]
-            super().__init__(words)
+            super().__init__(set_name, words)
         except KeyError as err:
             raise RuntimeError(f"Key {err} not found") from err
 
@@ -177,6 +213,6 @@ class TomlConfig(Config):
                     )
                     for dct in toml["words"]
                 ]
-                super().__init__(words)
+                super().__init__(file_path, words)
         except KeyError as err:
             raise RuntimeError(f"Key {err} not found") from err

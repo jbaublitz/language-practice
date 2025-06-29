@@ -24,7 +24,7 @@ from gi.repository import (  # type: ignore  # pylint: disable=wrong-import-orde
     Gtk,
 )
 
-from language_practice.config import TomlConfig
+from language_practice.config import Config, TomlConfig
 from language_practice.flashcard import Flashcard  # type: ignore
 from language_practice.gui.study_window import StudyWindow
 from language_practice.sqlite import SqliteHandle
@@ -250,6 +250,11 @@ class MainWindow(Gtk.ApplicationWindow):
         self.add_action(action)
         menu_model.append("Recreate database", "win.recreate_database")
 
+        action = Gio.SimpleAction.new("export")
+        action.connect("activate", self.export_button)
+        self.add_action(action)
+        menu_model.append("Export set", "win.export")
+
         action = Gio.SimpleAction.new("import")
         action.connect("activate", self.import_button)
         self.add_action(action)
@@ -339,7 +344,20 @@ class MainWindow(Gtk.ApplicationWindow):
         Handle import button action.
         """
         file_dialog = Gtk.FileDialog()
-        file_dialog.open_multiple(callback=self.handle_files)
+        file_dialog.open_multiple(callback=self.handle_import_files)
+
+    #  pylint: disable=unused-argument
+    def export_button(self, action, param):
+        """
+        Handle import button action.
+        """
+        selected = list(map(lambda tup: tup[0], self.flashcard_sets.get_selected()))
+        file_dialog = Gtk.FileDialog()
+        file_dialog.select_folder(
+            callback=lambda dialog, task: self.handle_export_files(
+                dialog, task, selected
+            )
+        )
 
     #  pylint: disable=unused-argument
     def delete_flashcard_set(self, action, param):
@@ -354,7 +372,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 self.handle.delete_set(set_id)
             self.flashcard_sets.delete_row(row)
 
-    def handle_files(self, dialog: Gtk.FileDialog, task: Gio.Task):
+    def handle_import_files(self, dialog: Gtk.FileDialog, task: Gio.Task):
         """
         Handle importing files on button press.
         """
@@ -369,6 +387,25 @@ class MainWindow(Gtk.ApplicationWindow):
                     GLib.idle_add, self.update_ui_when_done, current_import
                 )
             )
+
+    def handle_export_files(self, dialog: Gtk.FileDialog, result, selected: list[str]):
+        """
+        Handle importing files on button press.
+        """
+        export_dest = dialog.select_folder_finish(result)
+        if not os.path.isdir(export_dest):
+            dialog = Gtk.AlertDialog()
+            dialog.set_message(f"{export_dest} must be a directory")
+            dialog.set_modal(True)
+            dialog.choose()
+            return
+
+        for one_selected in selected:
+            config = self.handle.export_config(one_selected)
+            fut = asyncio.run_coroutine_threadsafe(
+                self.handle_single_export(export_dest, config), self.loop
+            )
+            fut.result()
 
     async def handle_single_import(self, current_import: str):
         """
@@ -396,6 +433,12 @@ class MainWindow(Gtk.ApplicationWindow):
             return (None, None)
 
         return (toml, await scrape(toml.get_words()))
+
+    async def handle_single_export(self, export_dest: str, config: Config):
+        """
+        Handle TOML exports.
+        """
+        config.export(export_dest)
 
     def update_ui_when_done(self, current_import, future):
         """
