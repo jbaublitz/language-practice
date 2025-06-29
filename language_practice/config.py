@@ -28,9 +28,10 @@ class Entry:
         aspect: str | None,
         usage: str | None,
         part_of_speech: str | None,
-        charts: list[list[str]] | None,
+        charts: list[list[list[str]]] | None,
         repetition: WordRepetition,
         lang: str | None,
+        sql_id: int | None,
     ):
         self.word = word
         self.definition = definition
@@ -41,6 +42,7 @@ class Entry:
         self.charts = charts
         self.repetition = repetition
         self.lang = lang
+        self.sql_id = sql_id
 
     def get_word(self) -> str:
         """
@@ -78,7 +80,7 @@ class Entry:
         """
         return self.part_of_speech
 
-    def get_charts(self) -> list[list[str]] | None:
+    def get_charts(self) -> list[list[list[str]]] | None:
         """
         Get charts.
         """
@@ -95,6 +97,12 @@ class Entry:
         Get the language associated with this word file, if any.
         """
         return self.lang
+
+    def get_sql_id(self) -> int | None:
+        """
+        Get the SQL ID of the current entry.
+        """
+        return self.sql_id
 
 
 class Config:
@@ -150,7 +158,7 @@ class Config:
             parsed_dct = {
                 k: v
                 for k, v in entry.__dict__.items()
-                if k not in ("lang", "repetition") and v is not None
+                if k not in ("lang", "repetition", "sql_id") and v is not None
             }
             dct["words"].append(parsed_dct)
 
@@ -176,6 +184,7 @@ class GraphicalConfig(Config):
                     dct.get("charts", None),
                     WordRepetition(2.5, 0, 0, date.today(), False),
                     lang,
+                    None,
                 )
                 for dct in dcts
             ]
@@ -210,6 +219,7 @@ class TomlConfig(Config):
                         dct.get("charts", None),
                         WordRepetition(2.5, 0, 0, date.today(), False),
                         lang,
+                        None,
                     )
                     for dct in toml["words"]
                 ]

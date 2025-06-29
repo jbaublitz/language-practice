@@ -64,15 +64,14 @@ class Flashcard:
         else:
             next_entry = self.review.popleft()
 
-        self.handle.update_config(next_entry.get_word(), next_entry.get_repetition())
+        sql_id = next_entry.get_sql_id()
+        if sql_id is None:
+            raise RuntimeError(
+                "All entries loaded from the database should have a record ID"
+            )
+        self.handle.update_config(sql_id, next_entry.get_repetition())
 
         if next_entry.get_repetition().get_review():
             self.review.append(next_entry)
         else:
             self.complete.append(next_entry)
-
-    def get_all_entries(self) -> list[Entry]:
-        """
-        Get all flashcard entries.
-        """
-        return list(self.review) + list(self.scheduled) + self.complete

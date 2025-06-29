@@ -13,21 +13,17 @@ from sqlite3 import IntegrityError
 from threading import Thread
 from typing import Self
 
-import gi  # type: ignore
+import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import (  # type: ignore  # pylint: disable=wrong-import-order
-    Adw,
-    Gio,
-    GLib,
-    Gtk,
-)
+from gi.repository import Adw, Gio, GLib, Gtk  # pylint: disable=wrong-import-order
 
-from language_practice.config import Config, TomlConfig
-from language_practice.flashcard import Flashcard  # type: ignore
+from language_practice.config import Config, Entry, TomlConfig
+from language_practice.flashcard import Flashcard
+from language_practice.gui.add_edit_window import AddEditWindow
 from language_practice.gui.study_window import StudyWindow
-from language_practice.sqlite import SqliteHandle
+from language_practice.sqlite import SetExistsException, SqliteHandle
 from language_practice.web import scrape
 
 
@@ -87,10 +83,6 @@ class GuiApplication(Adw.Application):
                 border-right: 1px solid @borders;
             }
             
-            list row label {
-                margin-left: 20px;
-            }
-
             list > row:last-child {
                 border-bottom-left-radius: 8px;
                 border-bottom-right-radius: 8px;
@@ -174,6 +166,18 @@ class GuiApplication(Adw.Application):
                 margin-bottom: 15px;
                 margin-left: 15px;
                 margin-right: 15px;
+            }
+
+            label.flashcard-set {
+                margin-left: 15px;
+            }
+
+            label.search-label {
+                margin-bottom: 7px;
+            }
+
+            label.add-edit-label {
+                margin-bottom: 7px;
             }
             """
         )
@@ -290,9 +294,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         sets = self.handle.get_all_sets()
         for flashcard_set in sets:
-            label = Gtk.Label(halign=Gtk.Align.START)
-            label.set_text(flashcard_set)
-            self.flashcard_sets.add_row(Gtk.CheckButton(), label)
+            self.flashcard_sets.add_row(flashcard_set)
 
     #  pylint: disable=unused-argument
     def toggle_search(self, button):
@@ -322,7 +324,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 search_grid = SearchListBox()
                 res = self.handle.search(text)
                 for tup in res:
-                    search_grid.add_row(tup)
+                    search_grid.add_row(tup, self.handle_edit)
                 self.search_scrollable = Gtk.ScrolledWindow()
                 self.search_scrollable.set_vexpand(True)
                 self.search_scrollable.set_child(search_grid)
@@ -450,7 +452,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         (set_name, _) = os.path.splitext(os.path.basename(current_import))
         try:
-            new = self.handle.import_set(
+            self.handle.import_set(
                 set_name,
                 toml,
                 scraped,
@@ -473,11 +475,17 @@ class MainWindow(Gtk.ApplicationWindow):
             if set_id is not None:
                 self.handle.delete_set(set_id)
             return
+        except SetExistsException as err:
+            dialog = Gtk.AlertDialog()
+            dialog.set_message(f"{current_import}: {err}")
+            dialog.set_modal(True)
+            dialog.choose()
+            set_id = self.handle.get_id_from_file_name(set_name)
+            if set_id is not None:
+                self.handle.delete_set(set_id)
+            return
 
-        if new:
-            label = Gtk.Label(halign=Gtk.Align.START)
-            label.set_text(set_name)
-            self.flashcard_sets.add_row(Gtk.CheckButton(), label)
+        self.flashcard_sets.add_row(set_name)
 
     #  pylint: disable=unused-argument
     def handle_start(self, button):
@@ -497,6 +505,21 @@ class MainWindow(Gtk.ApplicationWindow):
             win = StudyWindow(self.flashcard)
             win.present()
 
+    def handle_edit(self, button):
+        """
+        Open up edit dialog for entry.
+        """
+        win = AddEditWindow(
+            self.handle.load_single_entry(button.get_index()), self.update_entry
+        )
+        win.present()
+
+    def update_entry(self, entry: Entry):
+        """
+        Update an entry from the UI.
+        """
+        self.handle.update_single_entry(entry)
+
 
 class FlashcardListBox(Gtk.ListBox):
     """
@@ -506,14 +529,20 @@ class FlashcardListBox(Gtk.ListBox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def add_row(self, checkbox: Gtk.CheckButton, label: Gtk.Label):
+    def add_row(self, flashcard_set: str):
         """
         Add a row to the grid.
         """
-        listboxrow = Gtk.ListBoxRow()
+        checkbox = Gtk.CheckButton()
+        label = Gtk.Label(halign=Gtk.Align.START)
+        label.set_text(flashcard_set)
+        label.set_css_classes(["flashcard-set"])
+
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         box.append(checkbox)
         box.append(label)
+
+        listboxrow = Gtk.ListBoxRow()
         listboxrow.set_child(box)
         self.append(listboxrow)
 
@@ -574,24 +603,50 @@ class SearchListBox(Gtk.ListBox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def add_row(self, entries: tuple[str, str, str]):
+    def add_row(self, entries: tuple[int, str, str, str], callback):
         """
         Add a row to the grid.
         """
         row = Gtk.ListBoxRow()
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        (word, definition, usage) = entries
+        (idx, word, definition, usage) = entries
         word_label = Gtk.Label()
         word_label.set_text(word)
+        word_label.set_css_classes(["search-label"])
         box.append(word_label)
         def_label = Gtk.Label()
         def_label.set_text(definition)
+        def_label.set_css_classes(["search-label"])
         box.append(def_label)
         if usage is not None:
             usage_label = Gtk.Label()
             usage_label.set_text(usage)
+            usage_label.set_css_classes(["search-label"])
             box.append(usage_label)
         else:
             usage_label = None
+        button = IndexButton(idx)
+        button.set_label("Edit")
+        button.set_hexpand(False)
+        button.set_halign(Gtk.Align.CENTER)
+        button.connect("clicked", callback)
+        box.append(button)
         row.set_child(box)
         self.append(row)
+
+
+class IndexButton(Gtk.Button):
+    """
+    Button that also stores an entry index for use when clicked.
+    """
+
+    def __init__(self, idx: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.idx = idx
+
+    def get_index(self) -> int:
+        """
+        Get the index associated with the button.
+        """
+        return self.idx
