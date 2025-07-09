@@ -1,3 +1,11 @@
+# Public Archive
+
+## Anki is a good alternative and what I use now.
+
+I would highly recommend generating column-based files with separators programmatically
+that you can import into Anki. This works quite nicely and Anki updates the existing
+sets with changes much like language-practice.
+
 # `language_practice`
 
 Flashcard terminal app with spaced repetition
