@@ -9,9 +9,11 @@ Inflection charts are pulled from wiktionary.
 """
 
 import argparse
+import os
 import sys
 
 from language_practice.gui import GuiApplication, start_loop
+from language_practice.sqlite import SqliteHandle
 
 
 class Once(argparse.Action):
@@ -38,18 +40,30 @@ def main():
     parse.add_argument("-t", "--traceback", action="store_true")
     args = parse.parse_args()
 
+    handle = None
     try:
+        directory = os.path.join(os.environ["HOME"], ".local", "share", "language-practice")
+        os.makedirs(directory, exist_ok=True)
+        handle = SqliteHandle(os.path.join(directory, "language-practice.db"))
         loop = start_loop()
-        gui = GuiApplication(loop, application_id="me.jbaublitz.LanguagePractice")
+        gui = GuiApplication(handle, loop, application_id="me.jbaublitz.LanguagePractice")
         gui.run()
     except Exception as err:  # pylint: disable=broad-exception-caught
+        if handle is not None:
+            handle.close()
+
         if args.traceback:
             raise err
 
         print(f"{err}")
         sys.exit(1)
     except KeyboardInterrupt:
+        if handle is not None:
+            handle.close()
         print("Exiting...")
+    else:
+        if handle is not None:
+            handle.close()
 
 
 if __name__ == "__main__":
